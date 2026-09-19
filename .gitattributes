@@ -1,0 +1,7 @@
+# Force LF line endings for files that execute inside Linux containers.
+# Windows checkouts default to CRLF, which breaks shebang-based scripts
+# (e.g. "set -eu\r" is parsed as an invalid option).
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+Makefile text eol=lf
