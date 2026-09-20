@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path
 
 from quantum_lake_student.config import Settings
-from quantum_lake_student.connections import minio_client
+from quantum_lake_student.connections import minio_client, read_lake_object
 from quantum_lake_student.models import StageResult
 from quantum_lake_student.syndromes import (
     BRONZE_OBJECT,
@@ -18,44 +18,6 @@ from quantum_lake_student.syndromes import (
     build_syndrome_tables,
     parquet_bytes,
 )
-
-
-def _local_read_path(root: Path, object_name: str) -> Path:
-    candidates = [root / object_name]
-
-    if object_name.startswith("bronze/"):
-        candidates.append(root / "raw" / object_name.removeprefix("bronze/"))
-
-    if object_name.startswith("metadata/course-release/"):
-        candidates.append(
-            root
-            / "metadata"
-            / object_name.removeprefix("metadata/course-release/")
-        )
-
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-
-    raise FileNotFoundError(
-        f"Lake object not found: {object_name}; checked {candidates}"
-    )
-
-
-def _read_object(settings: Settings, object_name: str) -> bytes:
-    if settings.lake_backend == "local":
-        return _local_read_path(
-            settings.local_lake_root,
-            object_name,
-        ).read_bytes()
-
-    client = minio_client(settings)
-    response = client.get_object(settings.s3_bucket, object_name)
-    try:
-        return response.read()
-    finally:
-        response.close()
-        response.release_conn()
 
 
 def _atomic_write(path: Path, value: bytes) -> None:
@@ -231,10 +193,10 @@ def prepare_syndromes(
     """Build and publish the syndrome Silver, trace, and issue tables."""
     result = StageResult(stage="prepare_syndromes", run_id=run_id)
 
-    manifest_bytes = _read_object(settings, MANIFEST_OBJECT)
+    manifest_bytes = read_lake_object(settings, MANIFEST_OBJECT)
     manifest = _release_manifest(manifest_bytes)
     expected_object = _expected_syndrome_object(manifest)
-    archive_bytes = _read_object(settings, BRONZE_OBJECT)
+    archive_bytes = read_lake_object(settings, BRONZE_OBJECT)
 
     expected_bytes = int(expected_object["bytes"])
     if len(archive_bytes) != expected_bytes:

@@ -4,18 +4,22 @@ from __future__ import annotations
 
 import ast
 import csv
-import hashlib
 import json
 import re
 from dataclasses import dataclass
 from io import BytesIO, TextIOWrapper
 from pathlib import PurePosixPath
-from zipfile import BadZipFile, ZipFile
+from zipfile import ZipFile
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .models import stable_record_hash
+from .source_validation import (
+    SourceObjectSpec,
+    SourceValidationError,
+    validate_source_object,
+)
 
 
 SOURCE_NAME = "qec_syndromes"
@@ -102,27 +106,6 @@ class SyndromeTables:
     input_count: int
     accepted_count: int
     rejected_count: int
-
-
-def sha256_bytes(value: bytes) -> str:
-    """Return the SHA-256 digest for exact input bytes."""
-    return hashlib.sha256(value).hexdigest()
-
-
-def is_safe_member_path(name: str) -> bool:
-    """Return whether an archive member stays inside an extraction root."""
-    normalized = name.replace("\\", "/")
-    member_path = PurePosixPath(normalized)
-    has_drive = bool(
-        member_path.parts
-        and re.fullmatch(r"[A-Za-z]:", member_path.parts[0])
-    )
-    return (
-        bool(member_path.parts)
-        and not member_path.is_absolute()
-        and ".." not in member_path.parts
-        and not has_drive
-    )
 
 
 def parse_filename(member: str) -> ExperimentMetadata:
@@ -323,11 +306,18 @@ def build_syndrome_tables(
     run_id: str,
 ) -> SyndromeTables:
     """Validate the Bronze archive and construct all syndrome output tables."""
-    input_sha256 = sha256_bytes(archive_bytes)
-    if input_sha256 != expected_sha256:
-        raise SyndromeArchiveError(
-            "Syndrome archive SHA-256 does not match the release manifest"
-        )
+    spec = SourceObjectSpec(
+        source_name=SOURCE_NAME,
+        bronze_object=BRONZE_OBJECT,
+        expected_bytes=len(archive_bytes),
+        expected_sha256=expected_sha256,
+    )
+    try:
+        source_validation = validate_source_object(archive_bytes, spec)
+    except SourceValidationError as error:
+        raise SyndromeArchiveError(str(error)) from error
+
+    input_sha256 = source_validation.sha256
 
     silver_rows: list[dict[str, object]] = []
     trace_rows: list[dict[str, object]] = []
@@ -335,35 +325,8 @@ def build_syndrome_tables(
     rejected_ids: set[str] = set()
     input_count = 0
 
-    try:
-        archive = ZipFile(BytesIO(archive_bytes))
-    except BadZipFile as error:
-        raise SyndromeArchiveError("Syndrome object is not a valid ZIP") from error
-
-    with archive:
-        infos = archive.infolist()
-        member_names = [info.filename for info in infos]
-
-        unsafe = [
-            name for name in member_names
-            if not is_safe_member_path(name)
-        ]
-        if unsafe:
-            raise SyndromeArchiveError(
-                f"Unsafe archive member path: {unsafe[0]}"
-            )
-
-        if len(member_names) != len(set(member_names)):
-            raise SyndromeArchiveError(
-                "Syndrome archive contains duplicate member names"
-            )
-
-        bad_crc_member = archive.testzip()
-        if bad_crc_member is not None:
-            raise SyndromeArchiveError(
-                f"CRC check failed for archive member: {bad_crc_member}"
-            )
-
+    with ZipFile(BytesIO(archive_bytes)) as archive:
+        member_names = source_validation.member_names
         csv_members = sorted(
             name for name in member_names
             if name.lower().endswith(".csv")

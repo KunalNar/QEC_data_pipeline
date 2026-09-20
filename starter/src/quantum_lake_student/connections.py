@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import urlparse
 
 import psycopg
@@ -19,6 +20,46 @@ def minio_client(settings: Settings) -> Minio:
         secret_key=settings.s3_secret_key,
         secure=parsed.scheme == "https",
     )
+
+
+def local_lake_object_path(root: Path, object_name: str) -> Path:
+    """Resolve an object name in either seeded or unpacked local layout."""
+    candidates = [root / object_name]
+
+    if object_name.startswith("bronze/"):
+        candidates.append(root / "raw" / object_name.removeprefix("bronze/"))
+
+    if object_name.startswith("metadata/course-release/"):
+        candidates.append(
+            root
+            / "metadata"
+            / object_name.removeprefix("metadata/course-release/")
+        )
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+
+    raise FileNotFoundError(
+        f"Lake object not found: {object_name}; checked {candidates}"
+    )
+
+
+def read_lake_object(settings: Settings, object_name: str) -> bytes:
+    """Read exact object bytes from the configured local or MinIO lake."""
+    if settings.lake_backend == "local":
+        return local_lake_object_path(
+            settings.local_lake_root,
+            object_name,
+        ).read_bytes()
+
+    client = minio_client(settings)
+    response = client.get_object(settings.s3_bucket, object_name)
+    try:
+        return response.read()
+    finally:
+        response.close()
+        response.release_conn()
 
 
 def bronze_inventory(settings: Settings) -> list[tuple[str, int]]:
