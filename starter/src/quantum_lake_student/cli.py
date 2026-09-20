@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import sys
+from uuid import uuid4
 
 from rich.console import Console
 from rich.table import Table
 
 from .config import Settings
 from .connections import bronze_inventory, check_platform
+from .stages.prepare_syndromes import prepare_syndromes
 
 
 console = Console()
@@ -29,6 +31,18 @@ def command_inventory(settings: Settings) -> int:
     for key, size in bronze_inventory(settings):
         table.add_row(key, f"{size:,}")
     console.print(table)
+    return 0
+
+
+def command_prepare_syndromes(settings: Settings) -> int:
+    run_id = "syndrome-" + uuid4().hex
+    result = prepare_syndromes(settings, run_id=run_id)
+    console.print(
+        "[green]OK[/green] syndrome Silver: "
+        f"{result.output_count:,} accepted from "
+        f"{result.input_count:,} source rows; "
+        f"{result.issue_count:,} issue(s)"
+    )
     return 0
 
 
@@ -54,7 +68,7 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument(
         "command",
-        choices=("check", "inventory", "run", "train"),
+        choices=("check", "inventory", "prepare-syndromes", "run", "train"),
         help="Action to perform",
     )
     return result
@@ -66,6 +80,7 @@ def main() -> None:
     commands = {
         "check": command_check,
         "inventory": command_inventory,
+        "prepare-syndromes": command_prepare_syndromes,
         "run": command_run,
         "train": command_train,
     }
