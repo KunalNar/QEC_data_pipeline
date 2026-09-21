@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .config import Settings
 from .connections import bronze_inventory, check_platform
+from .stages.prepare_qasmbench import prepare_qasmbench
 from .stages.prepare_syndromes import prepare_syndromes
 
 
@@ -46,6 +47,18 @@ def command_prepare_syndromes(settings: Settings) -> int:
     return 0
 
 
+def command_prepare_qasmbench(settings: Settings) -> int:
+    run_id = "qasmbench-" + uuid4().hex
+    result = prepare_qasmbench(settings, run_id=run_id)
+    console.print(
+        "[green]OK[/green] QASMBench Silver: "
+        f"{result.output_count:,} rows from "
+        f"{result.input_count:,} QASM files; "
+        f"{result.issue_count:,} issue(s)"
+    )
+    return 0
+
+
 def command_run(_: Settings) -> int:
     console.print(
         "[yellow]Pipeline stages are intentionally unimplemented.[/yellow]\n"
@@ -68,7 +81,14 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument(
         "command",
-        choices=("check", "inventory", "prepare-syndromes", "run", "train"),
+        choices=(
+            "check",
+            "inventory",
+            "prepare-syndromes",
+            "prepare-qasmbench",
+            "run",
+            "train",
+        ),
         help="Action to perform",
     )
     return result
@@ -81,6 +101,7 @@ def main() -> None:
         "check": command_check,
         "inventory": command_inventory,
         "prepare-syndromes": command_prepare_syndromes,
+        "prepare-qasmbench": command_prepare_qasmbench,
         "run": command_run,
         "train": command_train,
     }

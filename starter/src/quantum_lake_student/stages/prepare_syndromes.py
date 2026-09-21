@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-from io import BytesIO
 from pathlib import Path
 
 from quantum_lake_student.config import Settings
-from quantum_lake_student.connections import minio_client, read_lake_object
+from quantum_lake_student.connections import read_lake_object, write_lake_object
 from quantum_lake_student.models import StageResult
+from quantum_lake_student.part1_results import (
+    merge_evidence,
+    update_row_counts,
+    update_run_record,
+)
 from quantum_lake_student.syndromes import (
     BRONZE_OBJECT,
     MANIFEST_OBJECT,
@@ -18,33 +21,6 @@ from quantum_lake_student.syndromes import (
     build_syndrome_tables,
     parquet_bytes,
 )
-
-
-def _atomic_write(path: Path, value: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_bytes(value)
-    temporary.replace(path)
-
-
-def _write_object(
-    settings: Settings,
-    object_name: str,
-    value: bytes,
-) -> None:
-    if settings.lake_backend == "local":
-        _atomic_write(settings.local_lake_root / object_name, value)
-        return
-
-    client = minio_client(settings)
-    client.put_object(
-        settings.s3_bucket,
-        object_name,
-        BytesIO(value),
-        length=len(value),
-        content_type="application/octet-stream",
-    )
-
 
 def _release_manifest(manifest_bytes: bytes) -> dict[str, object]:
     return json.loads(manifest_bytes.decode("utf-8"))
@@ -63,24 +39,6 @@ def _expected_syndrome_object(
         raise ValueError(
             "Release manifest has no qec_syndromes object"
         ) from error
-
-
-
-def _code_revision() -> tuple[str, str]:
-    supplied_revision = os.getenv("CODE_REVISION")
-    if supplied_revision:
-        return "git", supplied_revision
-
-    package_root = Path(__file__).resolve().parents[1]
-    hasher = hashlib.sha256()
-    for source_path in sorted(package_root.rglob("*.py")):
-        relative_path = source_path.relative_to(package_root).as_posix()
-        hasher.update(relative_path.encode("utf-8"))
-        hasher.update(b"\0")
-        hasher.update(source_path.read_bytes())
-        hasher.update(b"\0")
-    return "source_tree_sha256", hasher.hexdigest()
-
 
 def _check_results(tables) -> dict[str, dict[str, object]]:
     issue_rules = set(
@@ -211,21 +169,24 @@ def prepare_syndromes(
     )
 
     silver_output = parquet_bytes(tables.silver)
-    trace_output = parquet_bytes(tables.source_trace)
-    issues_output = parquet_bytes(tables.data_issues)
 
-    _write_object(settings, SILVER_OBJECT, silver_output)
-    _atomic_write(
-        results_root / "source_trace.parquet",
+    write_lake_object(settings, SILVER_OBJECT, silver_output)
+    (
+        merged_trace,
         trace_output,
-    )
-    _atomic_write(
-        results_root / "data_issues.parquet",
+        merged_issues,
         issues_output,
+    ) = merge_evidence(
+        results_root,
+        source_name="qec_syndromes",
+        source_trace=tables.source_trace,
+        data_issues=tables.data_issues,
     )
 
-    row_counts = {
-        "qec_syndromes": {
+    update_row_counts(
+        results_root,
+        source_name="qec_syndromes",
+        counts={
             "bronze_rows": tables.input_count,
             "silver_rows": tables.accepted_count,
             "rejected_rows": tables.rejected_count,
@@ -233,14 +194,7 @@ def prepare_syndromes(
             "weighted_observations": sum(
                 tables.silver.column("quantity").to_pylist()
             ),
-        }
-    }
-    _atomic_write(
-        results_root / "row_counts.json",
-        (
-            json.dumps(row_counts, indent=2, sort_keys=True)
-            + "\n"
-        ).encode("utf-8"),
+        },
     )
 
     result.input_count = tables.input_count
@@ -248,23 +202,22 @@ def prepare_syndromes(
     result.issue_count = tables.data_issues.num_rows
     result.finish()
 
-    revision_kind, revision = _code_revision()
-    run_record = {
-        "run_id": result.run_id,
-        "stage": result.stage,
-        "release": {
+    update_run_record(
+        results_root,
+        run_id=result.run_id,
+        stage=result.stage,
+        release={
             "name": manifest.get("release_name"),
             "version": manifest.get("bundle_version"),
             "date": manifest.get("release_date"),
         },
-        "code_revision": revision,
-        "code_revision_kind": revision_kind,
-        "started_at": result.started_at.isoformat(),
-        "finished_at": result.finished_at.isoformat(),
-        "input_hashes": {
+        started_at=result.started_at.isoformat(),
+        finished_at=result.finished_at.isoformat(),
+        source_name="qec_syndromes",
+        input_hashes={
             BRONZE_OBJECT: tables.input_sha256,
         },
-        "outputs": {
+        outputs={
             SILVER_OBJECT: {
                 "rows": tables.silver.num_rows,
                 "sha256": hashlib.sha256(
@@ -272,26 +225,19 @@ def prepare_syndromes(
                 ).hexdigest(),
             },
             "results/part1/source_trace.parquet": {
-                "rows": tables.source_trace.num_rows,
+                "rows": merged_trace.num_rows,
                 "sha256": hashlib.sha256(
                     trace_output
                 ).hexdigest(),
             },
             "results/part1/data_issues.parquet": {
-                "rows": tables.data_issues.num_rows,
+                "rows": merged_issues.num_rows,
                 "sha256": hashlib.sha256(
                     issues_output
                 ).hexdigest(),
             },
         },
-        "checks": _check_results(tables),
-    }
-    _atomic_write(
-        results_root / "run.json",
-        (
-            json.dumps(run_record, indent=2, sort_keys=True)
-            + "\n"
-        ).encode("utf-8"),
+        checks=_check_results(tables),
     )
     return result
 

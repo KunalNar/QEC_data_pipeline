@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -60,6 +61,34 @@ def read_lake_object(settings: Settings, object_name: str) -> bytes:
     finally:
         response.close()
         response.release_conn()
+
+
+def atomic_write(path: Path, value: bytes) -> None:
+    """Replace a local file atomically after creating its parent directory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_bytes(value)
+    temporary.replace(path)
+
+
+def write_lake_object(
+    settings: Settings,
+    object_name: str,
+    value: bytes,
+) -> None:
+    """Write one object to the configured local or MinIO lake."""
+    if settings.lake_backend == "local":
+        atomic_write(settings.local_lake_root / object_name, value)
+        return
+
+    client = minio_client(settings)
+    client.put_object(
+        settings.s3_bucket,
+        object_name,
+        BytesIO(value),
+        length=len(value),
+        content_type="application/octet-stream",
+    )
 
 
 def bronze_inventory(settings: Settings) -> list[tuple[str, int]]:
