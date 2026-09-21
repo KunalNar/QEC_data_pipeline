@@ -1,4 +1,4 @@
-"""Shared Part I trace, data-issue, and Parquet helpers."""
+"""Part I trace, data-issue, and Parquet helpers."""
 
 from __future__ import annotations
 
