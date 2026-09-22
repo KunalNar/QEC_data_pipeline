@@ -12,12 +12,16 @@ from zipfile import ZipFile
 import pyarrow as pa
 import yaml
 
+from .evidence import (
+    IssueLog,
+    SOURCE_TRACE_SCHEMA,
+    source_trace_row,
+)
 from .formats import b8_record_bytes, iter_b8_records, parse_01_records
-from .models import QualityFinding, Severity, stable_record_hash
+from .models import stable_record_hash
 from .source_validation import (
     SourceObjectSpec,
     SourceValidationError,
-    source_specs,
     validate_source_object,
 )
 
@@ -96,6 +100,8 @@ _FLIP_MEMBERS = (
     ),
 )
 
+SHOT_TRACE_MEMBER_COUNT = len(_B8_MEMBERS) + len(_FLIP_MEMBERS)
+
 
 class GoogleQecArchiveError(ValueError):
     """Raised when the Google archive cannot be interpreted safely."""
@@ -118,32 +124,13 @@ class ExperimentMetadata:
 class GoogleQecTables:
     experiments: pa.Table
     shots: pa.Table
-    findings: tuple[QualityFinding, ...]
+    source_trace: pa.Table
+    data_issues: pa.Table
     input_sha256: str
     experiment_count: int
     input_count: int
     accepted_count: int
     rejected_count: int
-
-
-def google_source_spec(manifest: Mapping[str, object]) -> SourceObjectSpec:
-    """Return the Google source specification from the release manifest."""
-    try:
-        spec = next(
-            item
-            for item in source_specs(manifest)
-            if item.source_name == SOURCE_NAME
-        )
-    except StopIteration as error:
-        raise SourceValidationError(
-            "Release manifest has no google_qec object"
-        ) from error
-
-    if spec.bronze_object != BRONZE_OBJECT:
-        raise SourceValidationError(
-            "Release manifest has an unexpected google_qec object path"
-        )
-    return spec
 
 
 def _integer_property(
@@ -294,27 +281,63 @@ def _source_record_id(
     )
 
 
-def _finding(
+def _trace_table(
     *,
-    rule_id: str,
-    member: str,
-    message: str,
-    observed_value: object,
-) -> QualityFinding:
-    return QualityFinding(
-        rule_id=rule_id,
-        severity=Severity.ERROR,
-        source_system=SOURCE_NAME,
-        source_record_locator=member,
-        message=message,
-        observed_value=str(observed_value),
+    input_sha256: str,
+    folder: str,
+    experiment_source_id: str,
+    shot_source_ids: list[str],
+    record_sizes: Mapping[str, int],
+) -> pa.Table:
+    columns: dict[str, list[object]] = {
+        name: [] for name in SOURCE_TRACE_SCHEMA.names
+    }
+
+    def add_row(source_record_id: str, member: str, locator: str) -> None:
+        row = source_trace_row(
+            source_record_id=source_record_id,
+            source_name=SOURCE_NAME,
+            bronze_object=BRONZE_OBJECT,
+            archive_member=member,
+            record_locator=locator,
+            input_sha256=input_sha256,
+        )
+        for name in SOURCE_TRACE_SCHEMA.names:
+            columns[name].append(row[name])
+
+    add_row(
+        experiment_source_id,
+        f"{folder}/properties.yml",
+        "yaml_document",
     )
+
+    for shot_index, source_record_id in enumerate(shot_source_ids):
+        for column, relative_name, _ in _B8_MEMBERS:
+            record_size = record_sizes[column]
+            add_row(
+                source_record_id,
+                f"{folder}/{relative_name}",
+                (
+                    f"shot={shot_index};"
+                    f"byte_offset={shot_index * record_size};"
+                    f"byte_length={record_size}"
+                ),
+            )
+        for _, relative_name in _FLIP_MEMBERS:
+            add_row(
+                source_record_id,
+                f"{folder}/{relative_name}",
+                f"shot={shot_index};line={shot_index + 1}",
+            )
+
+    return pa.Table.from_pydict(columns, schema=SOURCE_TRACE_SCHEMA)
 
 
 def build_google_qec_tables(
     archive_bytes: bytes,
     *,
     spec: SourceObjectSpec,
+    run_id: str,
 ) -> GoogleQecTables:
     """Validate Google records and return typed, in-memory Silver tables."""
     try:
@@ -337,7 +360,15 @@ def build_google_qec_tables(
 
     experiment_rows: list[dict[str, object]] = []
     shot_rows: list[dict[str, object]] = []
-    findings: list[QualityFinding] = []
+    trace_tables: list[pa.Table] = []
+    issues = IssueLog(
+        run_id=run_id,
+        source_name=SOURCE_NAME,
+        bronze_object=BRONZE_OBJECT,
+        input_sha256=validated.sha256,
+        default_action="exclude_experiment_from_silver",
+        default_locator="archive_member",
+    )
     input_count = 0
     rejected_count = 0
 
@@ -353,7 +384,7 @@ def build_google_qec_tables(
 
             metadata = _experiment_metadata(folder, properties)
             input_count += metadata.shots
-            finding_start = len(findings)
+            issue_start = len(issues)
             b8_values: dict[str, bytes] = {}
             record_sizes: dict[str, int] = {}
 
@@ -374,19 +405,18 @@ def build_google_qec_tables(
                 record_sizes[column] = record_size
 
                 if len(data) != expected_bytes:
-                    findings.append(
-                        _finding(
-                            rule_id="google.b8_length",
-                            member=member,
-                            message=(
-                                "Packed file length must equal shots times "
-                                "bytes per record"
-                            ),
-                            observed_value={
-                                "actual": len(data),
-                                "expected": expected_bytes,
-                            },
-                        )
+                    issues.add(
+                        "google.b8_length",
+                        (
+                            "Packed file length must equal shots times "
+                            "bytes per record"
+                        ),
+                        member=member,
+                        value={
+                            "actual": len(data),
+                            "expected": expected_bytes,
+                        },
+                        record={"experiment_id": folder},
                     )
                     continue
 
@@ -396,13 +426,12 @@ def build_google_qec_tables(
                     record_count=metadata.shots,
                 )
                 if padding_violations:
-                    findings.append(
-                        _finding(
-                            rule_id="google.b8_padding",
-                            member=member,
-                            message="Unused padding bits must be zero",
-                            observed_value=padding_violations,
-                        )
+                    issues.add(
+                        "google.b8_padding",
+                        "Unused padding bits must be zero",
+                        member=member,
+                        value=padding_violations,
+                        record={"experiment_id": folder},
                     )
 
             flip_values: dict[str, list[int]] = {}
@@ -412,43 +441,40 @@ def build_google_qec_tables(
                 try:
                     values = parse_01_records(raw)
                 except ValueError as error:
-                    findings.append(
-                        _finding(
-                            rule_id="google.01_domain",
-                            member=member,
-                            message=str(error),
-                            observed_value=repr(raw[:80]),
-                        )
+                    issues.add(
+                        "google.01_domain",
+                        str(error),
+                        member=member,
+                        value=repr(raw[:80]),
+                        record={"experiment_id": folder},
                     )
                     continue
 
                 flip_values[column] = values
                 if len(values) != metadata.shots:
-                    findings.append(
-                        _finding(
-                            rule_id="google.01_length",
-                            member=member,
-                            message=(
-                                "01 row count must equal the declared shots"
-                            ),
-                            observed_value={
-                                "actual": len(values),
-                                "expected": metadata.shots,
-                            },
-                        )
+                    issues.add(
+                        "google.01_length",
+                        "01 row count must equal the declared shots",
+                        member=member,
+                        value={
+                            "actual": len(values),
+                            "expected": metadata.shots,
+                        },
+                        record={"experiment_id": folder},
                     )
 
-            if len(findings) != finding_start:
+            if len(issues) != issue_start:
                 rejected_count += metadata.shots
                 continue
 
+            experiment_source_id = _source_record_id(
+                validated.sha256,
+                folder,
+                "properties.yml",
+            )
             experiment_rows.append(
                 {
-                    "source_record_id": _source_record_id(
-                        validated.sha256,
-                        folder,
-                        "properties.yml",
-                    ),
+                    "source_record_id": experiment_source_id,
                     "experiment_id": folder,
                     "basis": metadata.basis,
                     "distance": metadata.distance,
@@ -465,6 +491,7 @@ def build_google_qec_tables(
                 b8_values["detector_bits"],
                 bits_per_record=metadata.detector_count,
             )
+            folder_shot_ids: list[str] = []
             for shot_index in range(metadata.shots):
                 measurement_size = record_sizes["measurement_bits"]
                 sweep_size = record_sizes["sweep_bits"]
@@ -473,14 +500,16 @@ def build_google_qec_tables(
                 sweep_start = shot_index * sweep_size
                 detector_start = shot_index * detector_size
                 detector_values = next(detector_records)
+                shot_source_id = _source_record_id(
+                    validated.sha256,
+                    folder,
+                    f"shot={shot_index}",
+                )
+                folder_shot_ids.append(shot_source_id)
 
                 shot_rows.append(
                     {
-                        "source_record_id": _source_record_id(
-                            validated.sha256,
-                            folder,
-                            f"shot={shot_index}",
-                        ),
+                        "source_record_id": shot_source_id,
                         "experiment_id": folder,
                         "shot_index": shot_index,
                         "measurement_bits": b8_values["measurement_bits"][
@@ -501,18 +530,39 @@ def build_google_qec_tables(
                     }
                 )
 
+            trace_tables.append(
+                _trace_table(
+                    input_sha256=validated.sha256,
+                    folder=folder,
+                    experiment_source_id=experiment_source_id,
+                    shot_source_ids=folder_shot_ids,
+                    record_sizes=record_sizes,
+                )
+            )
+
     accepted_count = len(shot_rows)
     if accepted_count + rejected_count != input_count:
         raise RuntimeError(
             "Internal reconciliation failure: accepted + rejected != input"
         )
 
-    experiment_ids = [row["source_record_id"] for row in experiment_rows]
-    shot_ids = [row["source_record_id"] for row in shot_rows]
-    if len(experiment_ids) != len(set(experiment_ids)):
-        raise RuntimeError("Duplicate Google experiment source_record_id")
-    if len(shot_ids) != len(set(shot_ids)):
-        raise RuntimeError("Duplicate Google shot source_record_id")
+    source_ids = [
+        row["source_record_id"]
+        for row in [*experiment_rows, *shot_rows]
+    ]
+    if len(source_ids) != len(set(source_ids)):
+        raise RuntimeError("Duplicate Google source_record_id")
+
+    source_trace = (
+        pa.concat_tables(trace_tables)
+        if trace_tables
+        else pa.Table.from_pylist([], schema=SOURCE_TRACE_SCHEMA)
+    )
+    expected_trace_rows = len(experiment_rows) + (
+        len(shot_rows) * SHOT_TRACE_MEMBER_COUNT
+    )
+    if source_trace.num_rows != expected_trace_rows:
+        raise RuntimeError("Google source-trace row reconciliation failed")
 
     return GoogleQecTables(
         experiments=pa.Table.from_pylist(
@@ -520,7 +570,8 @@ def build_google_qec_tables(
             schema=EXPERIMENT_SCHEMA,
         ),
         shots=pa.Table.from_pylist(shot_rows, schema=SHOT_SCHEMA),
-        findings=tuple(findings),
+        source_trace=source_trace,
+        data_issues=issues.table(),
         input_sha256=validated.sha256,
         experiment_count=len(folders),
         input_count=input_count,
@@ -537,7 +588,7 @@ __all__ = [
     "GoogleQecTables",
     "SHOT_PATH",
     "SHOT_SCHEMA",
+    "SHOT_TRACE_MEMBER_COUNT",
     "SOURCE_NAME",
     "build_google_qec_tables",
-    "google_source_spec",
 ]
