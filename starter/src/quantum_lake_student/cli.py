@@ -13,6 +13,7 @@ from .config import Settings
 from .connections import bronze_inventory, check_platform
 from .stages.prepare_qasmbench import prepare_qasmbench
 from .stages.prepare_syndromes import prepare_syndromes
+from .stages.silvergoogle import prepare_google_data
 
 
 console = Console()
@@ -59,6 +60,18 @@ def command_prepare_qasmbench(settings: Settings) -> int:
     return 0
 
 
+def command_prepare_google(settings: Settings) -> int:
+    run_id = "google-qec-" + uuid4().hex
+    result = prepare_google_data(settings, run_id=run_id)
+    console.print(
+        "[green]OK[/green] Google QEC Silver: "
+        f"{result.output_count:,} rows from "
+        f"{result.input_count:,} shots; "
+        f"{result.issue_count:,} issue(s)"
+    )
+    return 0
+
+
 def command_run(_: Settings) -> int:
     console.print(
         "[yellow]Pipeline stages are intentionally unimplemented.[/yellow]\n"
@@ -86,6 +99,7 @@ def parser() -> argparse.ArgumentParser:
             "inventory",
             "prepare-syndromes",
             "prepare-qasmbench",
+            "prepare-google",
             "run",
             "train",
         ),
@@ -102,6 +116,7 @@ def main() -> None:
         "inventory": command_inventory,
         "prepare-syndromes": command_prepare_syndromes,
         "prepare-qasmbench": command_prepare_qasmbench,
+        "prepare-google": command_prepare_google,
         "run": command_run,
         "train": command_train,
     }
