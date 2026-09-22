@@ -14,8 +14,8 @@ import pyarrow as pa
 
 from .evidence import (
     DATA_ISSUES_SCHEMA,
+    IssueLog,
     SOURCE_TRACE_SCHEMA,
-    data_issue_row,
     parquet_bytes,
     source_trace_row,
 )
@@ -29,16 +29,16 @@ from .source_validation import (
 
 SOURCE_NAME = "qec_syndromes"
 BRONZE_OBJECT = "bronze/source=qec_syndromes/syndromes_dataset.zip"
-MANIFEST_OBJECT = "metadata/course-release/bundle-manifest.json"
 SILVER_OBJECT = "silver/qec_syndromes/syndrome_observation.parquet"
 EXPECTED_COLUMNS = ("labels", "syndromes", "quantity")
 EXPECTED_CSV_COUNT = 7
 
 _FILENAME_PATTERN = re.compile(
-    r"^d-(?P<distance>\d+)_pfr-(?P<fault_rate>\d+(?:\.\d+)?)_"
+    r"^d-3_pfr-(?P<fault_rate>\d+(?:\.\d+)?)_"
     r"nb-(?P<count>\d+)(?P<unit>[KMG]?)\.csv$",
     flags=re.IGNORECASE,
 )
+
 _COUNT_MULTIPLIERS = {
     "": 1,
     "K": 1_000,
@@ -60,13 +60,13 @@ SILVER_SCHEMA = pa.schema(
     ]
 )
 
+
 class SyndromeArchiveError(ValueError):
     """Raised when the archive cannot be processed safely."""
 
 
 @dataclass(frozen=True)
 class ExperimentMetadata:
-    distance: int
     physical_fault_rate: float
     nominal_observations: int
 
@@ -84,7 +84,7 @@ class SyndromeTables:
 
 
 def parse_filename(member: str) -> ExperimentMetadata:
-    """Read distance, fault rate, and nominal count from a CSV filename."""
+    """Validate distance 3 and read fault rate and nominal count."""
     match = _FILENAME_PATTERN.fullmatch(PurePosixPath(member).name)
     if match is None:
         raise SyndromeArchiveError(
@@ -94,7 +94,6 @@ def parse_filename(member: str) -> ExperimentMetadata:
     fields = match.groupdict()
     unit = fields["unit"].upper()
     return ExperimentMetadata(
-        distance=int(fields["distance"]),
         physical_fault_rate=float(fields["fault_rate"]),
         nominal_observations=(
             int(fields["count"]) * _COUNT_MULTIPLIERS[unit]
@@ -188,13 +187,6 @@ def _parse_quantity(value: object) -> tuple[int | None, str | None, str | None]:
     return quantity, None, None
 
 
-def _normalized_source_record(row: dict[object, object]) -> dict[str, object]:
-    return {
-        "__extra_fields__" if key is None else str(key): value
-        for key, value in row.items()
-    }
-
-
 def _source_record_id(
     input_sha256: str,
     archive_member: str,
@@ -220,48 +212,13 @@ def _experiment_id(input_sha256: str, archive_member: str) -> str:
     )
 
 
-def _issue(
-    *,
-    run_id: str,
-    input_sha256: str,
-    archive_member: str,
-    record_locator: str,
-    source_record_id: str | None,
-    rule_id: str,
-    observed_value: object,
-    source_record: object,
-    action: str,
-    reason: str,
-) -> dict[str, object]:
-    return data_issue_row(
-        run_id=run_id,
-        source_name=SOURCE_NAME,
-        bronze_object=BRONZE_OBJECT,
-        input_sha256=input_sha256,
-        archive_member=archive_member,
-        record_locator=record_locator,
-        source_record_id=source_record_id,
-        rule_id=rule_id,
-        observed_value=observed_value,
-        source_record=source_record,
-        action=action,
-        reason=reason,
-    )
-
-
 def build_syndrome_tables(
     archive_bytes: bytes,
     *,
-    expected_sha256: str,
+    spec: SourceObjectSpec,
     run_id: str,
 ) -> SyndromeTables:
     """Validate the Bronze archive and construct all syndrome output tables."""
-    spec = SourceObjectSpec(
-        source_name=SOURCE_NAME,
-        bronze_object=BRONZE_OBJECT,
-        expected_bytes=len(archive_bytes),
-        expected_sha256=expected_sha256,
-    )
     try:
         source_validation = validate_source_object(archive_bytes, spec)
     except SourceValidationError as error:
@@ -271,7 +228,12 @@ def build_syndrome_tables(
 
     silver_rows: list[dict[str, object]] = []
     trace_rows: list[dict[str, object]] = []
-    issue_rows: list[dict[str, object]] = []
+    issues = IssueLog(
+        run_id=run_id,
+        source_name=SOURCE_NAME,
+        bronze_object=BRONZE_OBJECT,
+        input_sha256=input_sha256,
+    )
     rejected_ids: set[str] = set()
     input_count = 0
 
@@ -316,92 +278,73 @@ def build_syndrome_tables(
                             member,
                             source_row_number,
                         )
-                        source_record = _normalized_source_record(row)
-                        record_issues: list[dict[str, object]] = []
+                        source_record = row
+                        issue_start = len(issues)
 
                         if (
                             None in row
-                            or any(row.get(column) is None for column in EXPECTED_COLUMNS)
+                            or any(
+                                row.get(column) is None
+                                for column in EXPECTED_COLUMNS
+                            )
                         ):
-                            record_issues.append(
-                                _issue(
-                                    run_id=run_id,
-                                    input_sha256=input_sha256,
-                                    archive_member=member,
-                                    record_locator=record_locator,
-                                    source_record_id=source_record_id,
-                                    rule_id="syndrome.csv_row_shape",
-                                    observed_value=source_record,
-                                    source_record=source_record,
-                                    action="excluded_from_silver",
-                                    reason=(
-                                        "CSV row must contain exactly the "
-                                        "three documented values"
-                                    ),
-                                )
+                            issues.add(
+                                "syndrome.csv_row_shape",
+                                (
+                                    "CSV row must contain exactly the "
+                                    "three documented values"
+                                ),
+                                member=member,
+                                locator=record_locator,
+                                record_id=source_record_id,
+                                value=source_record,
                             )
 
                         label, label_rule, label_reason = _parse_label(
                             row.get("labels")
                         )
                         if label_rule is not None:
-                            record_issues.append(
-                                _issue(
-                                    run_id=run_id,
-                                    input_sha256=input_sha256,
-                                    archive_member=member,
-                                    record_locator=record_locator,
-                                    source_record_id=source_record_id,
-                                    rule_id=label_rule,
-                                    observed_value=row.get("labels"),
-                                    source_record=source_record,
-                                    action="excluded_from_silver",
-                                    reason=label_reason or "",
-                                )
+                            issues.add(
+                                label_rule,
+                                label_reason or "",
+                                member=member,
+                                locator=record_locator,
+                                record_id=source_record_id,
+                                value=row.get("labels"),
+                                record=source_record,
                             )
 
                         syndrome_bits, syndrome_rule, syndrome_reason = (
                             parse_syndrome(row.get("syndromes"))
                         )
                         if syndrome_rule is not None:
-                            record_issues.append(
-                                _issue(
-                                    run_id=run_id,
-                                    input_sha256=input_sha256,
-                                    archive_member=member,
-                                    record_locator=record_locator,
-                                    source_record_id=source_record_id,
-                                    rule_id=syndrome_rule,
-                                    observed_value=row.get("syndromes"),
-                                    source_record=source_record,
-                                    action="excluded_from_silver",
-                                    reason=syndrome_reason or "",
-                                )
+                            issues.add(
+                                syndrome_rule,
+                                syndrome_reason or "",
+                                member=member,
+                                locator=record_locator,
+                                record_id=source_record_id,
+                                value=row.get("syndromes"),
+                                record=source_record,
                             )
 
                         quantity, quantity_rule, quantity_reason = (
                             _parse_quantity(row.get("quantity"))
                         )
                         if quantity_rule is not None:
-                            record_issues.append(
-                                _issue(
-                                    run_id=run_id,
-                                    input_sha256=input_sha256,
-                                    archive_member=member,
-                                    record_locator=record_locator,
-                                    source_record_id=source_record_id,
-                                    rule_id=quantity_rule,
-                                    observed_value=row.get("quantity"),
-                                    source_record=source_record,
-                                    action="excluded_from_silver",
-                                    reason=quantity_reason or "",
-                                )
+                            issues.add(
+                                quantity_rule,
+                                quantity_reason or "",
+                                member=member,
+                                locator=record_locator,
+                                record_id=source_record_id,
+                                value=row.get("quantity"),
+                                record=source_record,
                             )
                         elif quantity is not None:
                             file_weight_total += quantity
 
-                        if record_issues:
-                            issue_rows.extend(record_issues)
+                        if len(issues) > issue_start:
                             rejected_ids.add(source_record_id)
                             continue
 
@@ -435,25 +378,20 @@ def build_syndrome_tables(
                         )
 
             if file_weight_total != metadata.nominal_observations:
-                issue_rows.append(
-                    _issue(
-                        run_id=run_id,
-                        input_sha256=input_sha256,
-                        archive_member=member,
-                        record_locator="archive_member",
-                        source_record_id=None,
-                        rule_id="syndrome.weighted_total",
-                        observed_value={
-                            "actual": file_weight_total,
-                            "expected": metadata.nominal_observations,
-                        },
-                        source_record={"archive_member": member},
-                        action="published_valid_rows_only",
-                        reason=(
-                            "Positive quantities do not reconcile to the "
-                            "nominal observation count in the filename"
-                        ),
-                    )
+                issues.add(
+                    "syndrome.weighted_total",
+                    (
+                        "Positive quantities do not reconcile to the "
+                        "nominal observation count in the filename"
+                    ),
+                    member=member,
+                    locator="archive_member",
+                    value={
+                        "actual": file_weight_total,
+                        "expected": metadata.nominal_observations,
+                    },
+                    record={"archive_member": member},
+                    action="published_valid_rows_only",
                 )
 
     accepted_count = len(silver_rows)
@@ -477,10 +415,7 @@ def build_syndrome_tables(
             trace_rows,
             schema=SOURCE_TRACE_SCHEMA,
         ),
-        data_issues=pa.Table.from_pylist(
-            issue_rows,
-            schema=DATA_ISSUES_SCHEMA,
-        ),
+        data_issues=issues.table(),
         input_sha256=input_sha256,
         file_count=len(csv_members),
         input_count=input_count,

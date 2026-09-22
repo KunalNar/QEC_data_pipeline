@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass
 from io import BytesIO
@@ -46,6 +47,21 @@ class ValidatedSourceObject:
 def sha256_bytes(value: bytes) -> str:
     """Return the SHA-256 digest for exact input bytes."""
     return hashlib.sha256(value).hexdigest()
+
+
+def read_release_manifest(value: bytes) -> dict[str, object]:
+    """Parse the release manifest once for every dataset stage."""
+    try:
+        manifest = json.loads(value.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise SourceValidationError(
+            "Release manifest is not valid UTF-8 JSON"
+        ) from error
+    if not isinstance(manifest, dict):
+        raise SourceValidationError(
+            "Release manifest root must be a JSON object"
+        )
+    return manifest
 
 
 def is_safe_member_path(name: str) -> bool:
@@ -141,6 +157,30 @@ def source_specs(
         )
 
     return tuple(specs)
+
+
+def source_spec(
+    manifest: Mapping[str, object],
+    source_name: str,
+    *,
+    expected_object: str,
+) -> SourceObjectSpec:
+    """Return one validated source specification from the manifest."""
+    try:
+        spec = next(
+            item
+            for item in source_specs(manifest)
+            if item.source_name == source_name
+        )
+    except StopIteration as error:
+        raise SourceValidationError(
+            f"Release manifest has no {source_name} object"
+        ) from error
+    if spec.bronze_object != expected_object:
+        raise SourceValidationError(
+            f"Release manifest has an unexpected {source_name} object path"
+        )
+    return spec
 
 
 def validate_source_object(

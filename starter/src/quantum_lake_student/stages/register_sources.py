@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 from quantum_lake_student.config import Settings
@@ -16,6 +15,7 @@ from quantum_lake_student.source_validation import (
     SourceValidationError,
     ValidatedSourceObject,
     normalize_bronze_object,
+    read_release_manifest,
     source_specs,
     validate_source_object,
 )
@@ -51,17 +51,9 @@ def register_sources(
     """Verify that the complete supplied release is present and unchanged."""
     result = StageResult(stage="register_sources", run_id=run_id)
 
-    manifest_bytes = read_lake_object(settings, MANIFEST_OBJECT)
-    try:
-        manifest = json.loads(manifest_bytes.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise SourceValidationError(
-            "Release manifest is not valid UTF-8 JSON"
-        ) from error
-    if not isinstance(manifest, dict):
-        raise SourceValidationError(
-            "Release manifest root must be a JSON object"
-        )
+    manifest = read_release_manifest(
+        read_lake_object(settings, MANIFEST_OBJECT)
+    )
 
     specs = source_specs(manifest)
     manifest_sources = {spec.source_name for spec in specs}

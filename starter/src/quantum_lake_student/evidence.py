@@ -40,8 +40,7 @@ DATA_ISSUES_SCHEMA = pa.schema(
 )
 
 
-def json_value(value: object) -> str:
-    """Serialize evidence values consistently and readably."""
+def _json_value(value: object) -> str:
     return json.dumps(
         value,
         ensure_ascii=False,
@@ -50,53 +49,80 @@ def json_value(value: object) -> str:
     )
 
 
-def data_issue_row(
-    *,
-    run_id: str,
-    source_name: str,
-    bronze_object: str,
-    input_sha256: str,
-    archive_member: str,
-    record_locator: str,
-    source_record_id: str | None,
-    rule_id: str,
-    observed_value: object,
-    source_record: object,
-    action: str,
-    reason: str,
-    severity: str = "error",
-) -> dict[str, object]:
-    """Build one stable row for the shared Part I data-issues table."""
-    observed_text = (
-        observed_value
-        if isinstance(observed_value, str)
-        else json_value(observed_value)
-    )
-    issue_id = "issue-" + stable_record_hash(
-        {
-            "input_sha256": input_sha256,
-            "archive_member": archive_member,
-            "record_locator": record_locator,
-            "source_record_id": source_record_id,
-            "rule_id": rule_id,
-            "observed_value": observed_text,
-        }
-    )
-    return {
-        "issue_id": issue_id,
-        "run_id": run_id,
-        "source_record_id": source_record_id,
-        "source_name": source_name,
-        "bronze_object": bronze_object,
-        "archive_member": archive_member,
-        "record_locator": record_locator,
-        "rule_id": rule_id,
-        "severity": severity,
-        "observed_value": observed_text,
-        "source_record": json_value(source_record),
-        "action": action,
-        "reason": reason,
-    }
+class IssueLog:
+    """Collect assignment data issues with their shared source context."""
+
+    def __init__(
+        self,
+        *,
+        run_id: str,
+        source_name: str,
+        bronze_object: str,
+        input_sha256: str,
+        default_action: str = "excluded_from_silver",
+        default_locator: str = "",
+    ) -> None:
+        self.run_id = run_id
+        self.source_name = source_name
+        self.bronze_object = bronze_object
+        self.input_sha256 = input_sha256
+        self.default_action = default_action
+        self.default_locator = default_locator
+        self.rows: list[dict[str, object]] = []
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def add(
+        self,
+        rule_id: str,
+        reason: str,
+        *,
+        member: str,
+        value: object,
+        locator: str | None = None,
+        record_id: str | None = None,
+        record: object | None = None,
+        action: str | None = None,
+        severity: str = "error",
+    ) -> None:
+        locator = self.default_locator if locator is None else locator
+        action = self.default_action if action is None else action
+        observed_value = (
+            value if isinstance(value, str) else _json_value(value)
+        )
+        issue_id = "issue-" + stable_record_hash(
+            {
+                "input_sha256": self.input_sha256,
+                "archive_member": member,
+                "record_locator": locator,
+                "source_record_id": record_id,
+                "rule_id": rule_id,
+                "observed_value": observed_value,
+            }
+        )
+        self.rows.append(
+            {
+                "issue_id": issue_id,
+                "run_id": self.run_id,
+                "source_record_id": record_id,
+                "source_name": self.source_name,
+                "bronze_object": self.bronze_object,
+                "archive_member": member,
+                "record_locator": locator,
+                "rule_id": rule_id,
+                "severity": severity,
+                "observed_value": observed_value,
+                "source_record": _json_value(
+                    value if record is None else record
+                ),
+                "action": action,
+                "reason": reason,
+            }
+        )
+
+    def table(self) -> pa.Table:
+        return pa.Table.from_pylist(self.rows, schema=DATA_ISSUES_SCHEMA)
 
 
 def source_trace_row(
@@ -108,7 +134,7 @@ def source_trace_row(
     record_locator: str,
     input_sha256: str,
 ) -> dict[str, object]:
-    """Build one row for the shared Part I source-trace table."""
+    """Build one row for the source-trace table."""
     return {
         "source_record_id": source_record_id,
         "source_name": source_name,

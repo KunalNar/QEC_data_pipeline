@@ -12,9 +12,8 @@ from zipfile import ZipFile
 import pyarrow as pa
 
 from .evidence import (
-    DATA_ISSUES_SCHEMA,
+    IssueLog,
     SOURCE_TRACE_SCHEMA,
-    data_issue_row,
     source_trace_row,
 )
 from .models import stable_record_hash
@@ -28,7 +27,6 @@ from .source_validation import (
 
 SOURCE_NAME = "qasmbench"
 BRONZE_OBJECT = "bronze/source=qasmbench/qasmbench-qec.zip"
-MANIFEST_OBJECT = "metadata/course-release/bundle-manifest.json"
 CIRCUIT_OBJECT = "silver/qasmbench/circuit.parquet"
 STABILIZER_CHECK_OBJECT = "silver/qasmbench/stabilizer_check.parquet"
 CONDITIONAL_CORRECTION_OBJECT = (
@@ -250,6 +248,7 @@ _REFERENCE_PATTERN = re.compile(
     r"(?:\[(?P<index>\d+)\])?$"
 )
 _IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_]\w*$")
+
 _GATE_CALL_PATTERN = re.compile(
     r"^(?P<name>[A-Za-z_]\w*)"
     r"(?:\s*\((?P<arguments>[^)]*)\))?"
@@ -909,17 +908,10 @@ def _validate_curated_circuit(
 def build_qasmbench_tables(
     archive_bytes: bytes,
     *,
-    expected_bytes: int,
-    expected_sha256: str,
+    spec: SourceObjectSpec,
     run_id: str,
 ) -> QasmBenchTables:
     """Validate the Bronze archive and build the three QASMBench tables."""
-    spec = SourceObjectSpec(
-        source_name=SOURCE_NAME,
-        bronze_object=BRONZE_OBJECT,
-        expected_bytes=expected_bytes,
-        expected_sha256=expected_sha256,
-    )
     try:
         source_validation = validate_source_object(archive_bytes, spec)
     except SourceValidationError as error:
@@ -941,7 +933,13 @@ def build_qasmbench_tables(
     check_rows: list[dict[str, object]] = []
     correction_rows: list[dict[str, object]] = []
     trace_rows: list[dict[str, object]] = []
-    issue_rows: list[dict[str, object]] = []
+    issues = IssueLog(
+        run_id=run_id,
+        source_name=SOURCE_NAME,
+        bronze_object=BRONZE_OBJECT,
+        input_sha256=source_validation.sha256,
+        default_locator="qasm_member",
+    )
     rejected_ids: set[str] = set()
 
     with ZipFile(BytesIO(archive_bytes)) as archive:
@@ -958,21 +956,13 @@ def build_qasmbench_tables(
             try:
                 source_text = member_bytes.decode("utf-8")
             except UnicodeDecodeError as error:
-                issue_rows.append(
-                    data_issue_row(
-                        run_id=run_id,
-                        source_name=SOURCE_NAME,
-                        bronze_object=BRONZE_OBJECT,
-                        input_sha256=source_validation.sha256,
-                        archive_member=member,
-                        record_locator="qasm_member",
-                        source_record_id=circuit_source_id,
-                        rule_id="qasm.encoding",
-                        observed_value=str(error),
-                        source_record={"member_sha256": member_sha256},
-                        action="excluded_from_silver",
-                        reason="QASM member must be valid UTF-8 text",
-                    )
+                issues.add(
+                    "qasm.encoding",
+                    "QASM member must be valid UTF-8 text",
+                    member=member,
+                    record_id=circuit_source_id,
+                    value=str(error),
+                    record={"member_sha256": member_sha256},
                 )
                 rejected_ids.add(circuit_source_id)
                 continue
@@ -987,21 +977,13 @@ def build_qasmbench_tables(
                     checks=checks,
                 )
             except QasmParseError as error:
-                issue_rows.append(
-                    data_issue_row(
-                        run_id=run_id,
-                        source_name=SOURCE_NAME,
-                        bronze_object=BRONZE_OBJECT,
-                        input_sha256=source_validation.sha256,
-                        archive_member=member,
-                        record_locator="qasm_member",
-                        source_record_id=circuit_source_id,
-                        rule_id=error.rule_id,
-                        observed_value=str(error),
-                        source_record=source_text,
-                        action="excluded_from_silver",
-                        reason=str(error),
-                    )
+                issues.add(
+                    error.rule_id,
+                    str(error),
+                    member=member,
+                    record_id=circuit_source_id,
+                    value=str(error),
+                    record=source_text,
                 )
                 rejected_ids.add(circuit_source_id)
                 continue
@@ -1144,10 +1126,7 @@ def build_qasmbench_tables(
             trace_rows,
             schema=SOURCE_TRACE_SCHEMA,
         ),
-        data_issues=pa.Table.from_pylist(
-            issue_rows,
-            schema=DATA_ISSUES_SCHEMA,
-        ),
+        data_issues=issues.table(),
         input_sha256=source_validation.sha256,
         input_count=input_count,
         accepted_count=accepted_count,
@@ -1162,7 +1141,6 @@ __all__ = [
     "CONDITIONAL_CORRECTION_OBJECT",
     "CONDITIONAL_CORRECTION_SCHEMA",
     "EXPECTED_QASM_MEMBERS",
-    "MANIFEST_OBJECT",
     "QasmBenchArchiveError",
     "QasmBenchTables",
     "QasmParseError",

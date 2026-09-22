@@ -2,81 +2,50 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from pathlib import Path
 
 from quantum_lake_student.config import Settings
-from quantum_lake_student.connections import read_lake_object, write_lake_object
-from quantum_lake_student.evidence import parquet_bytes
+from quantum_lake_student.connections import read_lake_object
 from quantum_lake_student.models import StageResult
 from quantum_lake_student.part1_results import (
-    merge_evidence,
-    update_row_counts,
-    update_run_record,
+    check_result,
+    passed_checks,
+    publish_part1_results,
 )
 from quantum_lake_student.qasmbench import (
     BRONZE_OBJECT,
     CIRCUIT_OBJECT,
     CONDITIONAL_CORRECTION_OBJECT,
-    MANIFEST_OBJECT,
-    QasmBenchTables,
+    EXPECTED_QASM_MEMBERS,
     SOURCE_NAME,
     STABILIZER_CHECK_OBJECT,
+    QasmBenchTables,
     build_qasmbench_tables,
 )
 from quantum_lake_student.source_validation import (
-    SourceObjectSpec,
-    source_specs,
+    MANIFEST_OBJECT,
+    read_release_manifest,
+    source_spec,
 )
-
-
-def _release_manifest(manifest_bytes: bytes) -> dict[str, object]:
-    try:
-        manifest = json.loads(manifest_bytes.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError("Release manifest is not valid UTF-8 JSON") from error
-    if not isinstance(manifest, dict):
-        raise ValueError("Release manifest root must be a JSON object")
-    return manifest
-
-
-def _qasmbench_spec(
-    manifest: dict[str, object],
-) -> SourceObjectSpec:
-    try:
-        spec = next(
-            item for item in source_specs(manifest)
-            if item.source_name == SOURCE_NAME
-        )
-    except StopIteration as error:
-        raise ValueError("Release manifest has no qasmbench object") from error
-    if spec.bronze_object != BRONZE_OBJECT:
-        raise ValueError(
-            "Release manifest has an unexpected qasmbench object path"
-        )
-    return spec
 
 
 def _check_results(
     tables: QasmBenchTables,
 ) -> dict[str, dict[str, object]]:
-    circuit_rows = tables.circuits.to_pylist()
-    check_rows = tables.stabilizer_checks.to_pylist()
-    correction_rows = tables.conditional_corrections.to_pylist()
+    circuits = tables.circuits.to_pylist()
+    stabilizers = tables.stabilizer_checks.to_pylist()
+    corrections = tables.conditional_corrections.to_pylist()
     silver_ids = {
         row["source_record_id"]
-        for rows in (circuit_rows, check_rows, correction_rows)
+        for rows in (circuits, stabilizers, corrections)
         for row in rows
     }
-    trace_ids = set(
-        tables.source_trace.column("source_record_id").to_pylist()
-    )
-    variants_by_benchmark: dict[str, set[str]] = {}
-    for row in circuit_rows:
-        variants_by_benchmark.setdefault(
-            row["benchmark_name"], set()
-        ).add(row["variant"])
+    trace_ids = set(tables.source_trace["source_record_id"].to_pylist())
+
+    variants: dict[str, set[str]] = {}
+    for row in circuits:
+        variants.setdefault(row["benchmark_name"], set()).add(row["variant"])
+
     circuit_counts = {
         f"{row['benchmark_name']}:{row['variant']}": {
             "operations": row["operation_count"],
@@ -85,117 +54,81 @@ def _check_results(
             "qubits": row["qubit_count"],
             "classical_bits": row["classical_bit_count"],
         }
-        for row in circuit_rows
+        for row in circuits
     }
-
-    qec_sm_circuit_ids = {
+    qec_sm_ids = {
         row["circuit_id"]
-        for row in circuit_rows
+        for row in circuits
         if row["benchmark_name"] == "qec_sm_n5"
     }
-    check_counts = {
+    stabilizer_counts = {
         circuit_id: sum(
-            row["circuit_id"] == circuit_id for row in check_rows
+            row["circuit_id"] == circuit_id for row in stabilizers
         )
-        for circuit_id in qec_sm_circuit_ids
+        for circuit_id in qec_sm_ids
     }
     correction_counts = {
         circuit_id: sum(
-            row["circuit_id"] == circuit_id for row in correction_rows
+            row["circuit_id"] == circuit_id for row in corrections
         )
-        for circuit_id in qec_sm_circuit_ids
+        for circuit_id in qec_sm_ids
     }
 
-    return {
-        "bronze_size_and_sha256": {"status": "passed"},
-        "archive_member_paths": {"status": "passed"},
-        "archive_member_names_unique": {"status": "passed"},
-        "archive_crc": {"status": "passed"},
-        "qasm_member_set": {
-            "status": "passed",
-            "actual": tables.input_count,
-        },
-        "openqasm_structure": {
-            "status": (
-                "passed" if tables.rejected_count == 0 else "failed"
-            )
-        },
-        "source_and_transpiled_variants": {
-            "status": (
-                "passed"
-                if all(
-                    variants == {"source", "transpiled"}
-                    for variants in variants_by_benchmark.values()
-                )
-                and len(variants_by_benchmark) == 3
-                else "failed"
-            )
-        },
-        "declared_qubit_counts": {
-            "status": (
-                "passed"
-                if all(row["qubit_count"] == 5 for row in circuit_rows)
-                else "failed"
+    checks = passed_checks(
+        "bronze_size_and_sha256",
+        "archive_member_paths",
+        "archive_member_names_unique",
+        "archive_crc",
+    )
+    checks.update(
+        {
+            "qasm_member_set": check_result(
+                tables.input_count == len(EXPECTED_QASM_MEMBERS),
+                actual=tables.input_count,
             ),
-            "circuits": circuit_counts,
-        },
-        "executed_measurement_counts": {
-            "status": (
-                "passed"
-                if all(row["measurement_count"] == 5 for row in circuit_rows)
-                else "failed"
-            )
-        },
-        "operation_and_two_qubit_counts": {
-            "status": (
-                "passed"
-                if all(
+            "openqasm_structure": check_result(tables.rejected_count == 0),
+            "source_and_transpiled_variants": check_result(
+                len(variants) == 3
+                and all(
+                    value == {"source", "transpiled"}
+                    for value in variants.values()
+                )
+            ),
+            "declared_qubit_counts": check_result(
+                all(row["qubit_count"] == 5 for row in circuits),
+                circuits=circuit_counts,
+            ),
+            "executed_measurement_counts": check_result(
+                all(row["measurement_count"] == 5 for row in circuits)
+            ),
+            "operation_and_two_qubit_counts": check_result(
+                all(
                     row["operation_count"] >= row["two_qubit_gate_count"]
-                    for row in circuit_rows
-                )
-                else "failed"
+                    for row in circuits
+                ),
+                circuits=circuit_counts,
             ),
-            "circuits": circuit_counts,
-        },
-        "explicit_stabilizer_checks": {
-            "status": (
-                "passed"
-                if check_counts
-                and set(check_counts.values()) == {2}
-                else "failed"
+            "explicit_stabilizer_checks": check_result(
+                bool(stabilizer_counts)
+                and set(stabilizer_counts.values()) == {2},
+                rows=len(stabilizers),
             ),
-            "rows": len(check_rows),
-        },
-        "syndrome_controlled_corrections": {
-            "status": (
-                "passed"
-                if correction_counts
-                and set(correction_counts.values()) == {3}
-                else "failed"
+            "syndrome_controlled_corrections": check_result(
+                bool(correction_counts)
+                and set(correction_counts.values()) == {3},
+                rows=len(corrections),
             ),
-            "rows": len(correction_rows),
-        },
-        "row_reconciliation": {
-            "status": (
-                "passed"
-                if (
-                    tables.accepted_count + tables.rejected_count
-                    == tables.input_count
-                )
-                else "failed"
-            )
-        },
-        "source_record_id_uniqueness": {
-            "status": (
-                "passed"
-                if len(silver_ids) == tables.silver_row_count
-                else "failed"
-            )
-        },
-        "source_trace_coverage": {
-            "status": "passed" if silver_ids == trace_ids else "failed"
-        },
-    }
+            "row_reconciliation": check_result(
+                tables.accepted_count + tables.rejected_count
+                == tables.input_count
+            ),
+            "source_record_id_uniqueness": check_result(
+                len(silver_ids) == tables.silver_row_count
+            ),
+            "source_trace_coverage": check_result(silver_ids == trace_ids),
+        }
+    )
+    return checks
 
 
 def prepare_qasmbench(
@@ -206,45 +139,37 @@ def prepare_qasmbench(
 ) -> StageResult:
     """Build and publish all required QASMBench Silver tables."""
     result = StageResult(stage="prepare_qasmbench", run_id=run_id)
-
-    manifest = _release_manifest(
+    manifest = read_release_manifest(
         read_lake_object(settings, MANIFEST_OBJECT)
     )
-    spec = _qasmbench_spec(manifest)
-    archive_bytes = read_lake_object(settings, BRONZE_OBJECT)
+    spec = source_spec(
+        manifest,
+        SOURCE_NAME,
+        expected_object=BRONZE_OBJECT,
+    )
     tables = build_qasmbench_tables(
-        archive_bytes,
-        expected_bytes=spec.expected_bytes,
-        expected_sha256=spec.expected_sha256,
+        read_lake_object(settings, BRONZE_OBJECT),
+        spec=spec,
         run_id=run_id,
     )
 
-    circuit_output = parquet_bytes(tables.circuits)
-    check_output = parquet_bytes(tables.stabilizer_checks)
-    correction_output = parquet_bytes(tables.conditional_corrections)
-    write_lake_object(settings, CIRCUIT_OBJECT, circuit_output)
-    write_lake_object(settings, STABILIZER_CHECK_OBJECT, check_output)
-    write_lake_object(
+    result.input_count = tables.input_count
+    result.output_count = tables.silver_row_count
+    publish_part1_results(
         settings,
-        CONDITIONAL_CORRECTION_OBJECT,
-        correction_output,
-    )
-
-    (
-        merged_trace,
-        trace_output,
-        merged_issues,
-        issues_output,
-    ) = merge_evidence(
+        result,
         results_root,
         source_name=SOURCE_NAME,
+        manifest=manifest,
+        input_hashes={BRONZE_OBJECT: tables.input_sha256},
+        silver_tables={
+            CIRCUIT_OBJECT: tables.circuits,
+            STABILIZER_CHECK_OBJECT: tables.stabilizer_checks,
+            CONDITIONAL_CORRECTION_OBJECT: tables.conditional_corrections,
+        },
         source_trace=tables.source_trace,
         data_issues=tables.data_issues,
-    )
-    update_row_counts(
-        results_root,
-        source_name=SOURCE_NAME,
-        counts={
+        row_counts={
             "bronze_rows": tables.input_count,
             "circuit_rows": tables.circuits.num_rows,
             "stabilizer_check_rows": tables.stabilizer_checks.num_rows,
@@ -255,55 +180,13 @@ def prepare_qasmbench(
             "rejected_rows": tables.rejected_count,
             "issue_rows": tables.data_issues.num_rows,
         },
-    )
-
-    result.input_count = tables.input_count
-    result.output_count = tables.silver_row_count
-    result.issue_count = tables.data_issues.num_rows
-    result.finish()
-
-    update_run_record(
-        results_root,
-        run_id=result.run_id,
-        stage=result.stage,
-        release={
-            "name": manifest.get("release_name"),
-            "version": manifest.get("bundle_version"),
-            "date": manifest.get("release_date"),
-        },
-        started_at=result.started_at.isoformat(),
-        finished_at=result.finished_at.isoformat(),
-        source_name=SOURCE_NAME,
-        input_hashes={BRONZE_OBJECT: tables.input_sha256},
-        outputs={
-            CIRCUIT_OBJECT: {
-                "rows": tables.circuits.num_rows,
-                "sha256": hashlib.sha256(circuit_output).hexdigest(),
-            },
-            STABILIZER_CHECK_OBJECT: {
-                "rows": tables.stabilizer_checks.num_rows,
-                "sha256": hashlib.sha256(check_output).hexdigest(),
-            },
-            CONDITIONAL_CORRECTION_OBJECT: {
-                "rows": tables.conditional_corrections.num_rows,
-                "sha256": hashlib.sha256(correction_output).hexdigest(),
-            },
-            "results/part1/source_trace.parquet": {
-                "rows": merged_trace.num_rows,
-                "sha256": hashlib.sha256(trace_output).hexdigest(),
-            },
-            "results/part1/data_issues.parquet": {
-                "rows": merged_issues.num_rows,
-                "sha256": hashlib.sha256(issues_output).hexdigest(),
-            },
-        },
         checks=_check_results(tables),
     )
     return result
 
 
 def run(run_id: str) -> StageResult:
-    """Run the QASMBench portion of Silver preparation."""
+    """Run the QASMBench Silver stage using environment-based settings."""
     return prepare_qasmbench(
         Settings.from_environment(),
         run_id=run_id,

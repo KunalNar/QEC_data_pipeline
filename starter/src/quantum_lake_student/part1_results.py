@@ -11,8 +11,31 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from .connections import atomic_write
+from .config import Settings
+from .connections import atomic_write, write_lake_object
 from .evidence import DATA_ISSUES_SCHEMA, SOURCE_TRACE_SCHEMA, parquet_bytes
+from .models import StageResult
+
+
+def check_result(passed: bool, **details: object) -> dict[str, object]:
+    """Build one concise run-check result."""
+    return {
+        "status": "passed" if passed else "failed",
+        **details,
+    }
+
+
+def passed_checks(*names: str) -> dict[str, dict[str, object]]:
+    """Record checks already enforced by fail-fast validation."""
+    return {name: check_result(True) for name in names}
+
+
+def rules_check(
+    issue_rules: set[str],
+    *failed_rules: str,
+) -> dict[str, object]:
+    """Pass when none of the supplied issue rules were recorded."""
+    return check_result(issue_rules.isdisjoint(failed_rules))
 
 
 def code_revision() -> tuple[str, str]:
@@ -159,13 +182,6 @@ def update_run_record(
     if not isinstance(previous_checks, dict):
         previous_checks = {}
 
-    # Migrate the earlier syndrome-only flat check layout when encountered.
-    if previous_checks and all(
-        isinstance(value, dict) and "status" in value
-        for value in previous_checks.values()
-    ):
-        previous_checks = {"qec_syndromes": previous_checks}
-
     revision_kind, revision = code_revision()
     run_record = {
         "run_id": run_id,
@@ -186,3 +202,74 @@ def update_run_record(
         ),
     )
     return run_record
+
+
+def publish_part1_results(
+    settings: Settings,
+    result: StageResult,
+    results_root: Path,
+    *,
+    source_name: str,
+    manifest: dict[str, object],
+    input_hashes: dict[str, str],
+    silver_tables: dict[str, pa.Table],
+    source_trace: pa.Table,
+    data_issues: pa.Table,
+    row_counts: dict[str, int],
+    checks: dict[str, dict[str, object]],
+) -> None:
+    """Publish one source's Silver tables and required Part I evidence."""
+    outputs: dict[str, dict[str, object]] = {}
+    for object_name, table in silver_tables.items():
+        output = parquet_bytes(table)
+        write_lake_object(settings, object_name, output)
+        outputs[object_name] = {
+            "rows": table.num_rows,
+            "sha256": hashlib.sha256(output).hexdigest(),
+        }
+
+    (
+        merged_trace,
+        trace_output,
+        merged_issues,
+        issues_output,
+    ) = merge_evidence(
+        results_root,
+        source_name=source_name,
+        source_trace=source_trace,
+        data_issues=data_issues,
+    )
+    update_row_counts(
+        results_root,
+        source_name=source_name,
+        counts=row_counts,
+    )
+
+    result.issue_count = data_issues.num_rows
+    result.finish()
+    assert result.finished_at is not None
+
+    outputs["results/part1/source_trace.parquet"] = {
+        "rows": merged_trace.num_rows,
+        "sha256": hashlib.sha256(trace_output).hexdigest(),
+    }
+    outputs["results/part1/data_issues.parquet"] = {
+        "rows": merged_issues.num_rows,
+        "sha256": hashlib.sha256(issues_output).hexdigest(),
+    }
+    update_run_record(
+        results_root,
+        run_id=result.run_id,
+        stage=result.stage,
+        release={
+            "name": manifest.get("release_name"),
+            "version": manifest.get("bundle_version"),
+            "date": manifest.get("release_date"),
+        },
+        started_at=result.started_at.isoformat(),
+        finished_at=result.finished_at.isoformat(),
+        source_name=source_name,
+        input_hashes=input_hashes,
+        outputs=outputs,
+        checks=checks,
+    )
