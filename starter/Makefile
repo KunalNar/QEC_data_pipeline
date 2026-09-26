@@ -2,7 +2,7 @@
 
 PYTHON ?= python
 
-.PHONY: help check inventory syndromes qasmbench google gold-syndromes run train test
+.PHONY: help check inventory syndromes qasmbench google gold-syndromes ml-syndromes run train test
 
 help:
 	@echo "Student pipeline commands"
@@ -13,6 +13,7 @@ help:
 	@echo "  make qasmbench   Build the QASMBench Silver and evidence tables"
 	@echo "  make google      Build the Google QEC Silver and evidence tables"
 	@echo "  make gold-syndromes  Load the chosen syndrome Gold tables into PostgreSQL"
+	@echo "  make ml-syndromes    Export the syndrome ML table from PostgreSQL Gold"
 	@echo "  make run        Run your pipeline after implementing the stages"
 	@echo "  make train      Train/evaluate models from the required ML input tables"
 	@echo "  make test       Run automated tests"
@@ -34,6 +35,9 @@ google:
 
 gold-syndromes:
 	$(PYTHON) -m quantum_lake_student.cli load-syndromes-gold
+
+ml-syndromes:
+	$(PYTHON) -m quantum_lake_student.cli build-ml-syndromes
 
 run:
 	$(PYTHON) -m quantum_lake_student.cli run

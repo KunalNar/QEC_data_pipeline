@@ -38,6 +38,14 @@ separately traceable and their quantities can be summed later. We also do not
 make `physical_fault_rate` unique; two distinct source experiments could have
 the same rate.
 
+**Duplicate-combination note:** The supplied release has no repeated
+`(experiment_id, syndrome_bits, logical_error_label)` combination, but the
+assignment does not prohibit one. If two CSV rows do share all three values,
+Gold keeps both under their different `source_record_id` values. The ML export
+combines them into one example with `sample_weight = SUM(quantity)` and must
+still trace that example to both Gold rows. Matching syndrome bits alone do
+not cause rows with different experiments or labels to be combined.
+
 ### PostgreSQL definition
 
 The executable definition is [gold_syndrome.sql](../src/quantum_lake_student/sql/gold_syndrome.sql).
@@ -109,14 +117,21 @@ experiment table needs no separate fault-rate index.
    Bronze ZIP object, archive member, CSV row locator, and input SHA-256.
 
 The required syndrome ML table has **one example per distinct experiment,
-pattern, and label**, not necessarily one example per original CSV row. A
-committed Gold SQL view will group observations on those three values and use
-`SUM(quantity)` as `sample_weight`. Its repeatable `example_id` will be based
-on the same group key; a companion relation/view must map each example back
-to every contributing `source_record_id`. The exact hash encoding and export
-SQL will be fixed and tested when the Gold-to-ML stage is implemented. The
-course split is assigned from the experiment's physical fault rate during
-the permitted export step.
+pattern, and label**, not necessarily one example per original CSV row. The
+committed `gold.syndrome_ml_example` view groups observations on those three
+values and uses `SUM(quantity)` as `sample_weight`. Its `example_id` is
+`ml-syn-` plus SHA-256 of the UTF-8 experiment ID, a zero-byte separator, the
+16 syndrome bytes, and one label byte (`00` or `01`). The separator and fixed
+byte widths make the input unambiguous. The `gold.syndrome_ml_source` view maps
+each example back to every contributing `source_record_id`.
+
+`make ml-syndromes` reads these Gold views, uses the supplied
+`syndrome_data_split`, `syndrome_model_input`, and `partition_records` helpers,
+validates row IDs, labels, weights, split coverage, and source-link
+reconciliation, then writes
+`ml/ml_syndrome_decoder_example.parquet`. It does not reread Bronze or Silver.
+The assigned splits are validation for fault rate `0.0005`, test for `0.005`,
+and train for the other five rates.
 
 ### Strengths and trade-off
 

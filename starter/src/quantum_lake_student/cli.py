@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .config import Settings
 from .connections import bronze_inventory, check_platform
+from .stages.build_ml_tables import build_syndrome_ml_table
 from .stages.load_postgres import load_syndromes_gold
 from .stages.prepare_qasmbench import prepare_qasmbench
 from .stages.prepare_syndromes import prepare_syndromes
@@ -82,6 +83,18 @@ def command_load_syndromes_gold(settings: Settings) -> int:
     return 0
 
 
+def command_build_ml_syndromes(settings: Settings) -> int:
+    result = build_syndrome_ml_table(
+        settings,
+        run_id="ml-syndrome-" + uuid4().hex,
+    )
+    console.print(
+        "[green]OK[/green] syndrome ML: "
+        f"{result.output_count:,} examples exported from Gold"
+    )
+    return 0
+
+
 def command_run(_: Settings) -> int:
     console.print(
         "[yellow]Pipeline stages are intentionally unimplemented.[/yellow]\n"
@@ -111,6 +124,7 @@ def parser() -> argparse.ArgumentParser:
             "prepare-qasmbench",
             "prepare-google",
             "load-syndromes-gold",
+            "build-ml-syndromes",
             "run",
             "train",
         ),
@@ -129,6 +143,7 @@ def main() -> None:
         "prepare-qasmbench": command_prepare_qasmbench,
         "prepare-google": command_prepare_google,
         "load-syndromes-gold": command_load_syndromes_gold,
+        "build-ml-syndromes": command_build_ml_syndromes,
         "run": command_run,
         "train": command_train,
     }

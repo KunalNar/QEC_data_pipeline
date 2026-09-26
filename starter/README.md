@@ -20,8 +20,9 @@ Read these documents in order:
 Our evolving [Gold schema design](docs/gold-schema.md) records the chosen
 syndrome model and reserves sections for the Google and QASMBench decisions.
 After producing syndrome Silver, `make gold-syndromes` loads its three Gold
-tables into PostgreSQL. The full `make run` remains pending until the other
-Gold schemas and ML export are designed.
+tables into PostgreSQL. `make ml-syndromes` exports the syndrome ML handoff
+from Gold. The full `make run` remains pending until the other Gold schema and
+ML export are designed.
 
 The starter deliberately does not contain domain transformations, target
 business tables, feature builders, or fitted models. `make check` verifies

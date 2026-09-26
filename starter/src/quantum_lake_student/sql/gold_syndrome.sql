@@ -36,3 +36,43 @@ CREATE INDEX IF NOT EXISTS syndrome_observation_experiment_pattern_label_idx
 
 CREATE INDEX IF NOT EXISTS syndrome_observation_pattern_idx
     ON gold.syndrome_observation (syndrome_bits);
+
+CREATE OR REPLACE VIEW gold.syndrome_ml_example AS
+SELECT
+    'ml-syn-' || encode(
+        sha256(
+            convert_to(o.experiment_id, 'UTF8')
+            || decode('00', 'hex')
+            || p.syndrome_bits
+            || CASE WHEN o.logical_error_label
+                THEN decode('01', 'hex')
+                ELSE decode('00', 'hex')
+            END
+        ),
+        'hex'
+    ) AS example_id,
+    o.experiment_id,
+    e.physical_fault_rate,
+    p.syndrome_bits,
+    p.round_count::integer AS round_count,
+    p.check_count::integer AS check_count,
+    o.logical_error_label,
+    sum(o.quantity)::bigint AS sample_weight
+FROM gold.syndrome_observation AS o
+JOIN gold.syndrome_experiment AS e USING (experiment_id)
+JOIN gold.syndrome_pattern AS p USING (syndrome_bits)
+GROUP BY
+    o.experiment_id,
+    e.physical_fault_rate,
+    p.syndrome_bits,
+    p.round_count,
+    p.check_count,
+    o.logical_error_label;
+
+CREATE OR REPLACE VIEW gold.syndrome_ml_source AS
+SELECT m.example_id, o.source_record_id
+FROM gold.syndrome_ml_example AS m
+JOIN gold.syndrome_observation AS o
+    ON o.experiment_id = m.experiment_id
+    AND o.syndrome_bits = m.syndrome_bits
+    AND o.logical_error_label = m.logical_error_label;
