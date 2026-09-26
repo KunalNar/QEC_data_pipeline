@@ -8,6 +8,7 @@ from io import BytesIO
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import psycopg
 
 from quantum_lake_student.config import Settings
 from quantum_lake_student.connections import postgres_connection, read_lake_object
@@ -82,55 +83,62 @@ def load_syndromes_gold(settings: Settings, *, run_id: str) -> StageResult:
     result = StageResult(stage="load_syndromes_gold", run_id=run_id)
     silver = pq.read_table(BytesIO(read_lake_object(settings, SILVER_OBJECT)))
     rows = syndrome_gold_rows(silver)
+    with postgres_connection(settings) as connection:
+        replace_syndrome_gold(connection, rows)
+
+    result.input_count = silver.num_rows
+    result.output_count = len(rows.observations)
+    result.finish()
+    return result
+
+
+def replace_syndrome_gold(
+    connection: psycopg.Connection, rows: SyndromeGoldRows
+) -> None:
+    """Replace syndrome Gold within the caller's transaction."""
     expected_ids = {record[0] for record in rows.observations}
     schema_sql = files("quantum_lake_student").joinpath(
         "sql/gold_syndrome.sql"
     ).read_text(encoding="utf-8")
 
-    with postgres_connection(settings) as connection:
-        for statement in schema_sql.split(";"):
-            if statement.strip():
-                connection.execute(statement)
+    for statement in schema_sql.split(";"):
+        if statement.strip():
+            connection.execute(statement)
 
-        # PostgreSQL rolls these deletes and inserts back together on failure.
-        connection.execute("DELETE FROM gold.syndrome_observation")
-        connection.execute("DELETE FROM gold.syndrome_pattern")
-        connection.execute("DELETE FROM gold.syndrome_experiment")
-        with connection.cursor() as cursor:
-            cursor.executemany(
-                "INSERT INTO gold.syndrome_experiment VALUES (%s, %s)",
-                rows.experiments,
-            )
-            cursor.executemany(
-                "INSERT INTO gold.syndrome_pattern VALUES (%s, %s, %s)",
-                rows.patterns,
-            )
-            cursor.executemany(
-                "INSERT INTO gold.syndrome_observation VALUES (%s, %s, %s, %s, %s)",
-                rows.observations,
-            )
+    # The caller's transaction rolls all deletes and inserts back on failure.
+    connection.execute("DELETE FROM gold.syndrome_observation")
+    connection.execute("DELETE FROM gold.syndrome_pattern")
+    connection.execute("DELETE FROM gold.syndrome_experiment")
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            "INSERT INTO gold.syndrome_experiment VALUES (%s, %s)",
+            rows.experiments,
+        )
+        cursor.executemany(
+            "INSERT INTO gold.syndrome_pattern VALUES (%s, %s, %s)",
+            rows.patterns,
+        )
+        cursor.executemany(
+            "INSERT INTO gold.syndrome_observation VALUES (%s, %s, %s, %s, %s)",
+            rows.observations,
+        )
 
-        actual_ids = {
-            source_id
-            for (source_id,) in connection.execute(
-                "SELECT source_record_id FROM gold.syndrome_observation"
-            )
-        }
-        (actual_count, actual_weight) = connection.execute(
-            "SELECT count(*), coalesce(sum(quantity), 0) "
-            "FROM gold.syndrome_observation"
-        ).fetchone()
-        if (
-            actual_ids != expected_ids
-            or actual_count != len(rows.observations)
-            or actual_weight != rows.total_weight
-        ):
-            raise RuntimeError("Syndrome Silver-to-Gold reconciliation failed")
-
-    result.input_count = silver.num_rows
-    result.output_count = actual_count
-    result.finish()
-    return result
+    actual_ids = {
+        source_id
+        for (source_id,) in connection.execute(
+            "SELECT source_record_id FROM gold.syndrome_observation"
+        )
+    }
+    (actual_count, actual_weight) = connection.execute(
+        "SELECT count(*), coalesce(sum(quantity), 0) "
+        "FROM gold.syndrome_observation"
+    ).fetchone()
+    if (
+        actual_ids != expected_ids
+        or actual_count != len(rows.observations)
+        or actual_weight != rows.total_weight
+    ):
+        raise RuntimeError("Syndrome Silver-to-Gold reconciliation failed")
 
 
 def run(run_id: str) -> StageResult:

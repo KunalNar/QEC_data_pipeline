@@ -46,7 +46,10 @@ def code_revision() -> tuple[str, str]:
 
     package_root = Path(__file__).resolve().parent
     hasher = hashlib.sha256()
-    for source_path in sorted(package_root.rglob("*.py")):
+    for source_path in sorted(
+        path for path in package_root.rglob("*")
+        if path.suffix in {".py", ".sql"}
+    ):
         relative_path = source_path.relative_to(package_root).as_posix()
         hasher.update(relative_path.encode("utf-8"))
         hasher.update(b"\0")

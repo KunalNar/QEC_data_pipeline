@@ -13,8 +13,10 @@ from .config import Settings
 from .connections import bronze_inventory, check_platform
 from .stages.build_ml_tables import build_syndrome_ml_table
 from .stages.load_postgres import load_syndromes_gold
+from .stages.load_qasmbench_gold import load_qasmbench_gold
 from .stages.prepare_qasmbench import prepare_qasmbench
 from .stages.prepare_syndromes import prepare_syndromes
+from .stages.run_syndrome_qasm import run_syndrome_qasm
 from .stages.silvergoogle import prepare_google_data
 
 
@@ -95,11 +97,36 @@ def command_build_ml_syndromes(settings: Settings) -> int:
     return 0
 
 
+def command_load_qasmbench_gold(settings: Settings) -> int:
+    result = load_qasmbench_gold(
+        settings,
+        run_id="gold-qasmbench-" + uuid4().hex,
+    )
+    console.print(
+        "[green]OK[/green] QASMBench Gold: "
+        f"{result.output_count} traced circuit, check, and correction rows loaded"
+    )
+    return 0
+
+
+def command_run_syndrome_qasm(settings: Settings) -> int:
+    record = run_syndrome_qasm(
+        settings,
+        run_id="syndrome-qasm-" + uuid4().hex,
+    )
+    console.print(
+        "[green]OK[/green] syndrome and QASMBench Part I checkpoint: "
+        f"{len(record['outputs'])} output tables/artifacts recorded under "
+        "results/part1/syndrome_qasm/"
+    )
+    return 0
+
+
 def command_run(_: Settings) -> int:
     console.print(
-        "[yellow]Pipeline stages are intentionally unimplemented.[/yellow]\n"
-        "Implement your pipeline modules under src/quantum_lake_student, then "
-        "replace this command with your orchestrated Part I runner."
+        "[yellow]The full three-source Part I runner is not ready.[/yellow]\n"
+        "Use `make run-syndrome-qasm` for the completed two-source checkpoint. "
+        "Google Gold and its ML export are still pending."
     )
     return 2
 
@@ -125,6 +152,8 @@ def parser() -> argparse.ArgumentParser:
             "prepare-google",
             "load-syndromes-gold",
             "build-ml-syndromes",
+            "load-qasmbench-gold",
+            "run-syndrome-qasm",
             "run",
             "train",
         ),
@@ -144,6 +173,8 @@ def main() -> None:
         "prepare-google": command_prepare_google,
         "load-syndromes-gold": command_load_syndromes_gold,
         "build-ml-syndromes": command_build_ml_syndromes,
+        "load-qasmbench-gold": command_load_qasmbench_gold,
+        "run-syndrome-qasm": command_run_syndrome_qasm,
         "run": command_run,
         "train": command_train,
     }
