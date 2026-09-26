@@ -248,22 +248,23 @@ def _required_member_names(folder: str) -> tuple[str, ...]:
     return tuple(f"{folder}/{name}" for name in relative_names)
 
 
-def _padding_violation_count(
+def _padding_violations(
     data: bytes,
     *,
     bits_per_record: int,
     record_count: int,
-) -> int:
+) -> list[tuple[int, int]]:
     remainder = bits_per_record % 8
     if bits_per_record == 0 or remainder == 0:
-        return 0
+        return []
 
     record_bytes = b8_record_bytes(bits_per_record)
     padding_mask = (0xFF << remainder) & 0xFF
-    return sum(
-        bool(data[index * record_bytes + record_bytes - 1] & padding_mask)
+    return [
+        (index, data[index * record_bytes + record_bytes - 1])
         for index in range(record_count)
-    )
+        if data[index * record_bytes + record_bytes - 1] & padding_mask
+    ]
 
 
 def _source_record_id(
@@ -420,17 +421,23 @@ def build_google_qec_tables(
                     )
                     continue
 
-                padding_violations = _padding_violation_count(
+                padding_violations = _padding_violations(
                     data,
                     bits_per_record=bit_count,
                     record_count=metadata.shots,
                 )
-                if padding_violations:
+                for shot_index, padded_byte in padding_violations:
                     issues.add(
                         "google.b8_padding",
                         "Unused padding bits must be zero",
                         member=member,
-                        value=padding_violations,
+                        locator=f"shot={shot_index}",
+                        record_id=_source_record_id(
+                            validated.sha256,
+                            folder,
+                            f"shot={shot_index}",
+                        ),
+                        value=f"0x{padded_byte:02x}",
                         record={"experiment_id": folder},
                     )
 
@@ -441,13 +448,21 @@ def build_google_qec_tables(
                 try:
                     values = parse_01_records(raw)
                 except ValueError as error:
-                    issues.add(
-                        "google.01_domain",
-                        str(error),
-                        member=member,
-                        value=repr(raw[:80]),
-                        record={"experiment_id": folder},
-                    )
+                    for shot_index, value in enumerate(raw.splitlines()):
+                        if value not in {b"0", b"1"}:
+                            issues.add(
+                                "google.01_domain",
+                                str(error),
+                                member=member,
+                                locator=f"shot={shot_index};line={shot_index + 1}",
+                                record_id=_source_record_id(
+                                    validated.sha256,
+                                    folder,
+                                    f"shot={shot_index}",
+                                ),
+                                value=repr(value),
+                                record={"experiment_id": folder},
+                            )
                     continue
 
                 flip_values[column] = values
