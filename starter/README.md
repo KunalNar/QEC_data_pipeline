@@ -18,17 +18,20 @@ Read these documents in order:
 10. `../assignment/rubric.md`
 
 Our evolving [Gold schema design](docs/gold-schema.md) records the chosen
-syndrome model and reserves sections for the Google and QASMBench decisions.
+syndrome and QASMBench models, with Google Gold still pending.
 After producing syndrome Silver, `make gold-syndromes` loads its three Gold
 tables into PostgreSQL. `make ml-syndromes` exports the syndrome ML handoff
-from Gold. The full `make run` remains pending until the other Gold schema and
-ML export are designed.
+from Gold. `make gold-qasmbench` loads the QASMBench circuit relationships.
+`make run-syndrome-qasm` rebuilds these two sources through Gold, exports the
+syndrome ML table, and writes scoped evidence under
+`results/part1/syndrome_qasm/`. See the
+[two-source Part I report](docs/part1-syndrome-qasm-report.md). This is a
+checkpoint, not the full Part I submission: Google Gold, its ML export, the
+Google analysis and trace, and the final `make run` remain pending.
 
-The starter deliberately does not contain domain transformations, target
-business tables, feature builders, or fitted models. `make check` verifies
-connections, `make inventory` lists the three Bronze objects, and `make test`
-checks low-level utilities. `make run` and `make train` stop at separate
-unimplemented boundaries; replace both with your orchestrated stages.
+`make check` verifies connections, `make inventory` lists the three Bronze
+objects, and `make test` runs the automated checks. The full `make run` and
+Part II `make train` still stop at unimplemented boundaries.
 
 Suggested source layout:
 

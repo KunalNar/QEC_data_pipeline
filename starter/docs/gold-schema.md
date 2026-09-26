@@ -3,10 +3,10 @@
 This is the evolving design for the student-owned PostgreSQL Gold layer. It is
 not a copy of the six Silver Parquet tables. Each section states what one Gold
 row means, how it is keyed and checked, which queries its indexes support, and
-how its records trace back to the source. The syndrome design below is chosen;
-the Google and QASMBench designs are still to be decided. This document is a
-design specification. The syndrome DDL and loader are implemented; the
-Google and QASMBench Gold work is pending.
+how its records trace back to the source. The syndrome and QASMBench designs
+below are implemented; the Google design is still to be decided. This
+document is also the design specification for the completed source-specific
+Gold loaders.
 
 The Gold load must be all-or-nothing and repeatable: an incomplete load must
 not replace a complete one, and rerunning unchanged inputs must not add
@@ -152,12 +152,70 @@ decoder, and prediction relations. Record each row grain, keys, constraints,
 indexes, packed-bit storage choice, Gold-to-ML path, and trace through aligned
 companion files. Do not treat a decoder prediction as the actual outcome.
 
-## QASMBench circuits — design pending
+## QASMBench circuits — chosen design
 
-To be completed after choosing the circuit, stabilizer-check, and conditional
-correction relations. Record each row grain, keys, constraints, indexes, and
-trace to QASM members. No row-level relationship to a syndrome or Google
-experiment is supplied; shared QEC vocabulary alone is not a join key.
+Input: the three `silver/qasmbench/` Parquet tables. The current release has
+six circuit variants, four explicit stabilizer checks, and six conditional
+corrections. The Silver register description and each check's data-qubit list
+are expanded into relational rows, retaining declaration and participant
+order. The executable DDL is
+[gold_qasmbench.sql](../src/quantum_lake_student/sql/gold_qasmbench.sql).
+
+| Relation | One row represents | Key and relationships |
+| --- | --- | --- |
+| `gold.qasm_circuit` | One source or transpiled QASM member | `circuit_id` primary key; unique `source_record_id` and `(benchmark_name, variant)` |
+| `gold.qasm_register` | One declared quantum or classical register in a circuit | `(circuit_id, register_name)` primary key; circuit foreign key; unique declaration order per circuit |
+| `gold.qasm_stabilizer_check` | One explicit measured parity check | `source_record_id` primary key; circuit foreign key; `(circuit_id, check_id)` unique |
+| `gold.qasm_check_data_qubit` | One ordered data-qubit participant in a check | `(check_source_record_id, participant_order)` primary key; check foreign key; no duplicate qubit within a check |
+| `gold.qasm_conditional_correction` | One syndrome-controlled recovery operation | `source_record_id` primary key; circuit foreign key; condition-register foreign key |
+
+The circuit retains its file hash and executed operation, measurement, and
+two-qubit counts. PostgreSQL checks valid variants, 64-digit file hashes,
+positive register sizes, nonnegative counts and condition values, and
+two-qubit counts no greater than operation counts. The loader additionally
+checks that declared register sizes reconcile to the circuit totals; every
+ancilla, participant, syndrome bit, and target is in range in a register of
+the correct kind; and each condition value fits its declared classical
+register. These cross-row checks are done before the transaction because a
+simple row-level `CHECK` cannot compare against another table's register size.
+
+Primary and unique keys create indexes for IDs, family/variant lookup, and
+register/participant order. Explicit indexes on
+`qasm_stabilizer_check(circuit_id, syndrome_bit)` and
+`qasm_conditional_correction(circuit_id, condition_register,
+condition_value)` support the required circuit-to-parity-to-recovery query.
+The participant primary key supports ordered lookup for each check.
+
+`make gold-qasmbench` replaces only these five QASMBench relations in one
+PostgreSQL transaction and reconciles their counts and source IDs with all
+three Silver tables. `make run-syndrome-qasm` instead loads both the syndrome
+and QASMBench models in one transaction, so a failure in either leaves both
+previous versions intact. Circuit, check, and correction `source_record_id`
+values join to `source_trace.parquet` (under the scoped result directory for
+the combined checkpoint), which identifies the QASM ZIP
+member, source line(s), and Bronze hash. Register rows trace through their
+circuit; participant rows trace through their check. This preserves the
+distinction between register-local `q[0]` and `a[0]`.
+
+The [QASMBench analysis query](../src/quantum_lake_student/sql/analysis_qasmbench.sql)
+joins circuit, check, ordered participants, and conditional corrections. It
+uses the bit positions of the declared syndrome register to show which
+conditions contain each measured bit. The schema is intentionally
+separate from syndrome and Google experiments: no supplied row-level key
+links a QASM member to either dataset. QASMBench therefore has no required
+ML handoff table and supplies no labeled training rows.
+
+### Strengths and trade-off
+
+- Declared register identity and order are queryable instead of buried in
+  JSON; `q[0]` and `a[0]` remain different qubits.
+- Each check's ordered data-qubit participants are first-class relations,
+  making the parity mapping a normal SQL join.
+- Stable circuit/check/correction source IDs keep the original QASM-member
+  and statement trace, while source and transpiled variants remain distinct.
+- Five related tables are more than the three Silver tables, but they expose
+  the circuit structure required for analysis without a large generic QASM
+  operation model or an unsupported cross-dataset relationship.
 
 ## Cross-dataset decisions — design pending
 
