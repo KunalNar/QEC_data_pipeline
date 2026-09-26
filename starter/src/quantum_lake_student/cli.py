@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .config import Settings
 from .connections import bronze_inventory, check_platform
+from .stages.load_postgres import load_syndromes_gold
 from .stages.prepare_qasmbench import prepare_qasmbench
 from .stages.prepare_syndromes import prepare_syndromes
 from .stages.silvergoogle import prepare_google_data
@@ -72,6 +73,15 @@ def command_prepare_google(settings: Settings) -> int:
     return 0
 
 
+def command_load_syndromes_gold(settings: Settings) -> int:
+    result = load_syndromes_gold(settings, run_id="gold-syndrome-" + uuid4().hex)
+    console.print(
+        "[green]OK[/green] syndrome Gold: "
+        f"{result.output_count:,} observations loaded"
+    )
+    return 0
+
+
 def command_run(_: Settings) -> int:
     console.print(
         "[yellow]Pipeline stages are intentionally unimplemented.[/yellow]\n"
@@ -100,6 +110,7 @@ def parser() -> argparse.ArgumentParser:
             "prepare-syndromes",
             "prepare-qasmbench",
             "prepare-google",
+            "load-syndromes-gold",
             "run",
             "train",
         ),
@@ -117,6 +128,7 @@ def main() -> None:
         "prepare-syndromes": command_prepare_syndromes,
         "prepare-qasmbench": command_prepare_qasmbench,
         "prepare-google": command_prepare_google,
+        "load-syndromes-gold": command_load_syndromes_gold,
         "run": command_run,
         "train": command_train,
     }
