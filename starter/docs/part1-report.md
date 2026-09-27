@@ -7,6 +7,11 @@ writes the run evidence under `results/part1/`. `make test` runs the
 published tests. A second run replaces the same business records under the
 same stable IDs.
 
+The pipeline follows the course Bronze → Silver → Gold → ML layout:
+unchanged source archives become checked, source-specific Parquet tables;
+PostgreSQL connects the useful entities; committed Gold views supply the
+two fixed ML tables. Run evidence is kept separately in `results/part1/`.
+
 ## Sources and quality
 
 - The seven syndrome CSVs contain 75,598 aggregate rows with 70,000,000
@@ -55,19 +60,34 @@ The committed SQL answers the three required questions:
 1. [Syndrome fault-rate analysis](../src/quantum_lake_student/sql/analysis_syndrome_fault_rate.sql)
    gives weighted frequencies and logical-error fractions. The supplemental
    [pattern query](../src/quantum_lake_student/sql/analysis_syndrome_patterns.sql)
-   joins three Gold tables.
+   joins three Gold tables. Each fault-rate file represents 10 million
+   shots. In this release, the weighted logical-error fraction rises from
+   0.000234 at fault rate 0.00001 to 0.1865274 at 0.01; this describes the
+   supplied simulations, not a causal effect.
 2. [Google decoder analysis](../src/quantum_lake_student/sql/analysis_google_decoders.sql)
    gives decoder logical-error rates by distance and distance-three processor
    location. In this release its 20 groups cover four decoders at each of
-   five experiment groups. Rates vary by both decoder and location; this is
-   an observed association, not a causal estimate.
+   five experiment groups. For example, at distance three the
+   tensor-network decoder's observed rate ranges from 0.38392 at center
+   `(5, 7)` to 0.41304 at `(5, 3)`. Rates vary by decoder and location;
+   these are associations, not causal estimates.
 3. [QASMBench analysis](../src/quantum_lake_student/sql/analysis_qasmbench.sql)
    links repetition-code circuits, measured checks, data-qubit participants,
-   syndrome bits, and conditional corrections.
+   syndrome bits, and conditional corrections. Both source and transpiled
+   variants show `a[0]` checking `q[0]`/`q[1]` into `syn[0]` and `a[1]`
+   checking `q[1]`/`q[2]` into `syn[1]`; recovery is conditioned on the
+   measured syndrome value.
 
 `results/part1/source_trace.parquet` contains one or more Bronze pointers per
 Silver source ID. Each Google shot has eight companion-file trace rows.
-`trace_examples.json` demonstrates a syndrome ML example and a Google ML
-example resolving through Gold and Silver IDs to Bronze members; predictions
-remain pending Part II. `run.json`, `row_counts.json`, `data_issues.parquet`,
-and the analysis CSVs record the reproducible Part I evidence.
+`trace_examples.json` follows one syndrome ML example with weight 7 to its
+source row in `d-3_pfr-0.010000_nb-10M.csv`. It also follows shot zero in
+`surface_code_bX_d3_r25_center_3_5` through its Gold shot to eight aligned
+Bronze companion members. Part II predictions do not exist yet, so their
+final end-to-end trace remains pending. `run.json`, `row_counts.json`,
+`data_issues.parquet`, and the analysis CSVs record the reproducible Part I
+evidence.
+
+The local course workspace passed two complete `make run` executions and
+`make test` (183 tests). Reproduction from a fresh environment has not yet
+been recorded; the final prediction-level traces depend on Part II output.
