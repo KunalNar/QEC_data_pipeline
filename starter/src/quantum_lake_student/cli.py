@@ -12,11 +12,14 @@ from rich.table import Table
 from .config import Settings
 from .connections import bronze_inventory, check_platform
 from .stages.build_ml_tables import build_syndrome_ml_table
+from .stages.build_google_ml_table import build_google_ml_table
 from .stages.load_postgres import load_syndromes_gold
+from .stages.load_postgres_google import load_google_gold
 from .stages.load_qasmbench_gold import load_qasmbench_gold
 from .stages.prepare_qasmbench import prepare_qasmbench
 from .stages.prepare_syndromes import prepare_syndromes
 from .stages.run_syndrome_qasm import run_syndrome_qasm
+from .stages.run_part1 import run_part1
 from .stages.silvergoogle import prepare_google_data
 
 
@@ -109,6 +112,24 @@ def command_load_qasmbench_gold(settings: Settings) -> int:
     return 0
 
 
+def command_load_google_gold(settings: Settings) -> int:
+    result = load_google_gold(settings, run_id="gold-google-" + uuid4().hex)
+    console.print(
+        "[green]OK[/green] Google Gold: "
+        f"{result.output_count:,} experiment, shot, and prediction rows loaded"
+    )
+    return 0
+
+
+def command_build_ml_google(settings: Settings) -> int:
+    result = build_google_ml_table(settings, run_id="ml-google-" + uuid4().hex)
+    console.print(
+        "[green]OK[/green] Google ML: "
+        f"{result.output_count:,} shot examples exported from Gold"
+    )
+    return 0
+
+
 def command_run_syndrome_qasm(settings: Settings) -> int:
     record = run_syndrome_qasm(
         settings,
@@ -122,13 +143,13 @@ def command_run_syndrome_qasm(settings: Settings) -> int:
     return 0
 
 
-def command_run(_: Settings) -> int:
+def command_run(settings: Settings) -> int:
+    record = run_part1(settings, run_id="part1-" + uuid4().hex)
     console.print(
-        "[yellow]The full three-source Part I runner is not ready.[/yellow]\n"
-        "Use `make run-syndrome-qasm` for the completed two-source checkpoint. "
-        "Google Gold and its ML export are still pending."
+        "[green]OK[/green] Part I: "
+        f"{len(record['outputs'])} outputs recorded under results/part1/"
     )
-    return 2
+    return 0
 
 
 def command_train(_: Settings) -> int:
@@ -153,6 +174,8 @@ def parser() -> argparse.ArgumentParser:
             "load-syndromes-gold",
             "build-ml-syndromes",
             "load-qasmbench-gold",
+            "load-google-gold",
+            "build-ml-google",
             "run-syndrome-qasm",
             "run",
             "train",
@@ -174,6 +197,8 @@ def main() -> None:
         "load-syndromes-gold": command_load_syndromes_gold,
         "build-ml-syndromes": command_build_ml_syndromes,
         "load-qasmbench-gold": command_load_qasmbench_gold,
+        "load-google-gold": command_load_google_gold,
+        "build-ml-google": command_build_ml_google,
         "run-syndrome-qasm": command_run_syndrome_qasm,
         "run": command_run,
         "train": command_train,

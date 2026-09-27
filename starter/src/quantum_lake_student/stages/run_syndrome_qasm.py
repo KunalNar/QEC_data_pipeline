@@ -60,11 +60,15 @@ def _file_output(path: Path, data: bytes, rows: int) -> dict[str, object]:
     return {"rows": rows, "sha256": hashlib.sha256(data).hexdigest()}
 
 
-def _analysis_outputs(settings: Settings, root: Path) -> dict[str, dict[str, object]]:
+def _analysis_outputs(
+    settings: Settings,
+    root: Path,
+    analyses: dict[str, str] = ANALYSES,
+) -> dict[str, dict[str, object]]:
     outputs = {}
     with postgres_connection(settings) as connection:
         connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-        for name, sql_file in ANALYSES.items():
+        for name, sql_file in analyses.items():
             query = files("quantum_lake_student").joinpath(
                 f"sql/{sql_file}"
             ).read_text(encoding="utf-8")
@@ -84,8 +88,6 @@ def _analysis_outputs(settings: Settings, root: Path) -> dict[str, dict[str, obj
 
 
 def _trace_example(settings: Settings, root: Path) -> dict[str, object]:
-    trace_rows = pq.read_table(root / "source_trace.parquet").to_pylist()
-    trace_by_id = {row["source_record_id"]: row for row in trace_rows}
     ml_table = pq.read_table(BytesIO(read_lake_object(settings, SYNDROME_ML_OBJECT)))
     ml_examples = {row["example_id"]: row for row in ml_table.to_pylist()}
 
@@ -136,6 +138,14 @@ def _trace_example(settings: Settings, root: Path) -> dict[str, object]:
             (correction_source_id,),
         ).fetchone()
 
+    selected_ids = source_ids + [
+        circuit_source_id, check_source_id, correction_source_id
+    ]
+    trace_rows = pq.read_table(
+        root / "source_trace.parquet",
+        filters=[("source_record_id", "in", selected_ids)],
+    ).to_pylist()
+    trace_by_id = {row["source_record_id"]: row for row in trace_rows}
     ml_row = ml_examples.get(example_id)
     if ml_row is None or (
         ml_row["experiment_id"] != experiment_id
@@ -143,9 +153,6 @@ def _trace_example(settings: Settings, root: Path) -> dict[str, object]:
         or ml_row["sample_weight"] != weight
     ):
         raise RuntimeError("Syndrome Gold example missing from ML Parquet")
-    selected_ids = source_ids + [
-        circuit_source_id, check_source_id, correction_source_id
-    ]
     if (
         not source_ids
         or sum(row["quantity"] for row in observations) != weight
