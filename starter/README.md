@@ -28,6 +28,8 @@ syndrome ML table, and writes scoped evidence under
 [two-source Part I report](docs/part1-syndrome-qasm-report.md). This is a
 checkpoint, not the full Part I submission: Google Gold, its ML export, the
 Google analysis and trace, and the final `make run` remain pending.
+The [syndrome and QASMBench handoff](docs/part2-handoff.md) summarizes the
+available products for the Part II team.
 
 `make check` verifies connections, `make inventory` lists the three Bronze
 objects, and `make test` runs the automated checks. The full `make run` and
