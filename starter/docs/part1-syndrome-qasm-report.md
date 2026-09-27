@@ -30,6 +30,7 @@ not append duplicate business records.
   `source_record_id` values; the scoped `source_trace.parquet` maps all 75,614
   source rows to their ZIP member and record location. Rejected data would
   appear in `data_issues.parquet` with its rule, severity, action, and reason.
+  The current version of the assignment does not introduce any data erros.
 
 The discovery notebooks are
 [syndrome_data_discovery.ipynb](../notebooks/syndrome_data_discovery.ipynb) and
