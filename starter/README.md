@@ -17,23 +17,24 @@ Read these documents in order:
 9. `../assignment/part-2-ai-ml.md`
 10. `../assignment/rubric.md`
 
-Our evolving [Gold schema design](docs/gold-schema.md) records the chosen
-syndrome and QASMBench models, with Google Gold still pending.
+Our [Gold schema design](docs/gold-schema.md) records all three source models.
 After producing syndrome Silver, `make gold-syndromes` loads its three Gold
 tables into PostgreSQL. `make ml-syndromes` exports the syndrome ML handoff
 from Gold. `make gold-qasmbench` loads the QASMBench circuit relationships.
-`make run-syndrome-qasm` rebuilds these two sources through Gold, exports the
-syndrome ML table, and writes scoped evidence under
-`results/part1/syndrome_qasm/`. See the
-[two-source Part I report](docs/part1-syndrome-qasm-report.md). This is a
-checkpoint, not the full Part I submission: Google Gold, its ML export, the
-Google analysis and trace, and the final `make run` remain pending.
-The [syndrome and QASMBench handoff](docs/part2-handoff.md) summarizes the
-available products for the Part II team.
+`make gold-google` loads Google shots and decoder predictions, and
+`make ml-google` exports the Google ML handoff. `make run` rebuilds all three
+sources, loads Gold in one transaction, exports both ML tables, and writes
+the complete evidence under `results/part1/`; see the
+[Part I report](docs/part1-report.md). The earlier
+`make run-syndrome-qasm` checkpoint remains available under
+`results/part1/syndrome_qasm/`; see its
+[two-source report](docs/part1-syndrome-qasm-report.md).
+The [Part II handoff](docs/part2-handoff.md) summarizes the available data
+products for the ML team.
 
 `make check` verifies connections, `make inventory` lists the three Bronze
-objects, and `make test` runs the automated checks. The full `make run` and
-Part II `make train` still stop at unimplemented boundaries.
+objects, and `make test` runs the automated checks. Part II `make train`
+remains for the ML team.
 
 Suggested source layout:
 

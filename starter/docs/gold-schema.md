@@ -3,10 +3,9 @@
 This is the evolving design for the student-owned PostgreSQL Gold layer. It is
 not a copy of the six Silver Parquet tables. Each section states what one Gold
 row means, how it is keyed and checked, which queries its indexes support, and
-how its records trace back to the source. The syndrome and QASMBench designs
-below are implemented; the Google design is still to be decided. This
-document is also the design specification for the completed source-specific
-Gold loaders.
+how its records trace back to the source. The syndrome, Google, and QASMBench
+designs below are implemented. This document is also the design specification
+for the source-specific Gold loaders.
 
 The Gold load must be all-or-nothing and repeatable: an incomplete load must
 not replace a complete one, and rerunning unchanged inputs must not add
@@ -145,12 +144,50 @@ and train for the other five rates.
   table of precomputed totals. The cost is a three-table join and a grouping
   query, which is reasonable for this release's size.
 
-## Google hardware QEC — design pending
+## Google hardware QEC — chosen design
 
-To be completed after choosing the experiment, shot, detector-summary,
-decoder, and prediction relations. Record each row grain, keys, constraints,
-indexes, packed-bit storage choice, Gold-to-ML path, and trace through aligned
-companion files. Do not treat a decoder prediction as the actual outcome.
+Input: `silver/google_qec/experiment.parquet` and
+`silver/google_qec/shot.parquet`. The release has five experiments (four
+distance-three locations and one distance-five location), 50,000 shots per
+experiment, and four predictions per shot. The executable definition is
+[gold_google.sql](../src/quantum_lake_student/sql/gold_google.sql).
+
+| Relation | One row represents | Key and relationships |
+| --- | --- | --- |
+| `gold.google_experiment` | One hardware experiment directory | `experiment_id` primary key; unique experiment `source_record_id`; distance, location, bit counts, and declared shots |
+| `gold.google_shot` | One aligned hardware shot with its actual flip, packed measurement/sweep/detector bytes, and detector-event summary | `source_record_id` primary key; experiment foreign key; unique `(experiment_id, shot_index)` |
+| `gold.google_decoder` | One of the four supplied decoder methods | `decoder_name` primary key and allowed-name check |
+| `gold.google_decoder_prediction` | One decoder's predicted flip for one shot | `(source_record_id, decoder_name)` primary key; shot and decoder foreign keys |
+
+The four prediction columns from Silver become related rows in Gold; the
+actual observable flip stays on the shot and is never treated as a decoder
+prediction. Packed detector bytes stay on the shot, so the ML export can
+reproduce them without returning to Silver. The release contains 200,000
+distance-three shots with 25 detector bytes each and 50,000 distance-five
+shots with 75 bytes each: 8.75 MB of detector payload. A per-detector-bit
+table would require 70 million rows; one packed row and its event count are
+sufficient for the required queries. The loader checks packed
+length, unused padding, and event count before loading; Silver already checks
+the aligned companion files. PostgreSQL checks nonnegative indices/counts,
+positive experiment parameters, keys, and foreign keys. The experiment
+distance/location, shot experiment, and decoder lookup indexes support the
+required [decoder analysis](../src/quantum_lake_student/sql/analysis_google_decoders.sql).
+
+The `gold.google_ml_example` view joins each shot and experiment to all four
+decoder predictions. Its `example_id` is the unchanged shot
+`source_record_id`; `gold.google_ml_source` resolves it back to that Gold
+shot. `make ml-google` applies the supplied shot-index split, checks the
+exact Arrow schema and packed-bit values, and writes
+`ml/ml_google_decoder_example.parquet` from Gold only. The shot's source ID
+joins to eight rows in `results/part1/source_trace.parquet`: three packed
+files and five actual/predicted flip files. The experiment's source ID traces
+to `properties.yml`.
+
+The Google loader replaces its four relations in one transaction and
+reconciles experiment, shot, and prediction counts. The full `make run`
+command loads the syndrome, QASMBench, and Google models in one transaction;
+a failure in any model rolls back all three. Repeated runs replace records
+under the same stable keys instead of adding duplicates.
 
 ## QASMBench circuits — chosen design
 
@@ -217,13 +254,17 @@ ML handoff table and supplies no labeled training rows.
   the circuit structure required for analysis without a large generic QASM
   operation model or an unsupported cross-dataset relationship.
 
-## Cross-dataset decisions — design pending
+## Cross-dataset decisions
 
-Use consistent names for genuinely shared concepts, but do not manufacture
-identifiers or matches between independent sources. Document the final
-all-or-nothing load strategy, the rejected cross-source relationship, the
-reconciliation checks, and the three required analysis queries when all
-dataset schemas are chosen.
+The three models share the `gold` schema and source-record vocabulary, but
+not a fabricated experiment key. QASMBench has no supplied identifier that
+links one circuit to a particular simulated or Google experiment, so a
+row-level circuit-to-experiment join was investigated and rejected. The
+three-source runner checks every Silver source ID against the unified trace,
+loads all Gold relations in one transaction, exports both ML tables from
+Gold, and records the three required questions as reproducible SQL. Each
+Google ML example traces to one Gold shot and its eight Bronze companions;
+syndrome ML examples may trace to more than one Gold observation.
 
 ## Assignment contracts
 
