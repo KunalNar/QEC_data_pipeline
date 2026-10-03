@@ -8,17 +8,23 @@ the supplied ``data_split``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import balanced_accuracy_score, brier_score_loss
+from sklearn.neural_network import MLPClassifier
 
-from .ml import MODEL_SPLITS, unpack_little_endian_bits
+from .ml import MODEL_SPLITS, unpack_little_endian_bits, weighted_logical_error_rate
 
 
 TASK_C_DISTANCE = 3
 TASK_C_SHOT_LIMIT = 12_500
 TASK_C_DETECTOR_COUNT = 200
 FEATURE_NAMES = tuple(f"detector_{index}" for index in range(TASK_C_DETECTOR_COUNT))
+
+MLP_SETTINGS = {"hidden_layer_sizes": (64,), "alpha": 1.0, "max_iter": 200}
+THRESHOLD_GRID = np.round(np.arange(0.05, 0.96, 0.01), 2)
 
 
 @dataclass(frozen=True)
@@ -82,4 +88,135 @@ def build_features(google: pd.DataFrame) -> TaskCFeatures:
         features=features,
         label=subset["actual_observable_flip"].astype(bool).to_numpy(dtype=np.uint8),
         split=split,
+    )
+
+
+@dataclass(frozen=True)
+class TrainedMLP:
+    model: MLPClassifier
+    train_seconds: float
+
+
+def train_mlp(features: TaskCFeatures, seed: int) -> TrainedMLP:
+    """Fit the MLP on the supplied train rows only and time the fit."""
+    train_features, train_labels = features.part("train")
+    model = MLPClassifier(**MLP_SETTINGS, random_state=seed)
+    started = perf_counter()
+    model.fit(train_features, train_labels)
+    return TrainedMLP(model=model, train_seconds=perf_counter() - started)
+
+
+def choose_threshold(probabilities: np.ndarray, labels: np.ndarray) -> float:
+    """Return the grid threshold with the lowest error; ties go nearest 0.5."""
+    errors = [np.mean((probabilities >= value) != labels) for value in THRESHOLD_GRID]
+    best = min(
+        range(len(THRESHOLD_GRID)),
+        key=lambda index: (errors[index], abs(THRESHOLD_GRID[index] - 0.5)),
+    )
+    return float(THRESHOLD_GRID[best])
+
+
+def classification_metrics(
+    labels: np.ndarray,
+    predictions: np.ndarray,
+    probabilities: np.ndarray | None = None,
+) -> dict[str, float | None]:
+    """Logical-error rate, balanced accuracy, and Brier score for one shot set."""
+    return {
+        "logical_error_rate": weighted_logical_error_rate(
+            labels, predictions, np.ones(len(labels))
+        ),
+        "balanced_accuracy": float(balanced_accuracy_score(labels, predictions)),
+        "brier_score": (
+            None
+            if probabilities is None
+            else float(brier_score_loss(labels, probabilities))
+        ),
+    }
+
+
+@dataclass(frozen=True)
+class TaskCEvaluation:
+    threshold: float
+    predictions: pd.DataFrame
+    metrics: list[dict]
+
+
+def evaluate(features: TaskCFeatures, trained: TrainedMLP) -> TaskCEvaluation:
+    """Choose the MLP threshold on validation, then score validation and test.
+
+    A majority baseline, fitted on the train labels, is scored on the same rows.
+    """
+    validation_features, validation_labels = features.part("validation")
+    threshold = choose_threshold(
+        trained.model.predict_proba(validation_features)[:, 1], validation_labels
+    )
+
+    started = perf_counter()
+    flip_rate = float(features.part("train")[1].mean())
+    majority_train_seconds = perf_counter() - started
+
+    frames = []
+    metrics = []
+    for split in ("validation", "test"):
+        mask = features.split == split
+        labels = features.label[mask]
+
+        started = perf_counter()
+        mlp_probability = trained.model.predict_proba(features.features[mask])[:, 1]
+        mlp_predict_seconds = perf_counter() - started
+
+        started = perf_counter()
+        majority_probability = np.full(len(labels), flip_rate)
+        majority_predict_seconds = perf_counter() - started
+
+        scored = (
+            (
+                "C_mlp",
+                (mlp_probability >= threshold).astype(np.uint8),
+                mlp_probability,
+                trained.train_seconds,
+                mlp_predict_seconds,
+                threshold,
+            ),
+            (
+                "C_majority",
+                (majority_probability >= 0.5).astype(np.uint8),
+                majority_probability,
+                majority_train_seconds,
+                majority_predict_seconds,
+                0.5,
+            ),
+        )
+        for model_id, prediction, probability, train_s, predict_s, cutoff in scored:
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "example_id": features.example_id[mask],
+                        "model_id": model_id,
+                        "label": labels.astype(bool),
+                        "prediction": prediction.astype(bool),
+                        "probability": probability,
+                        "split": split,
+                    }
+                )
+            )
+            metrics.append(
+                {
+                    "task": "C",
+                    "model_id": model_id,
+                    "distance": TASK_C_DISTANCE,
+                    "split": split,
+                    **classification_metrics(labels, prediction, probability),
+                    "train_seconds": train_s,
+                    "predict_seconds": predict_s,
+                    "n_examples": int(mask.sum()),
+                    "threshold": cutoff,
+                }
+            )
+
+    return TaskCEvaluation(
+        threshold=threshold,
+        predictions=pd.concat(frames, ignore_index=True),
+        metrics=metrics,
     )

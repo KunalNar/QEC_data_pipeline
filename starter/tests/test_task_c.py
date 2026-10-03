@@ -2,11 +2,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from quantum_lake_student import task_c
 from quantum_lake_student.ml import google_data_split
 from quantum_lake_student.task_c import (
     FEATURE_NAMES,
+    TaskCFeatures,
+    TrainedMLP,
     build_features,
+    choose_threshold,
+    classification_metrics,
+    evaluate,
     select_task_c_rows,
+    train_mlp,
 )
 
 
@@ -115,3 +122,127 @@ def test_part_returns_only_the_requested_split():
     assert labels.shape == (2,)
     with pytest.raises(ValueError):
         result.part("holdout")
+
+
+def _random_features(seed=0, per_split=20):
+    generator = np.random.default_rng(seed)
+    count = per_split * 3
+    return TaskCFeatures(
+        example_id=np.array([f"shot-{index}" for index in range(count)]),
+        features=generator.integers(0, 2, size=(count, 200), dtype=np.uint8),
+        label=generator.integers(0, 2, size=count, dtype=np.uint8),
+        split=np.array(["train", "validation", "test"] * per_split),
+    )
+
+
+@pytest.mark.filterwarnings("ignore::sklearn.exceptions.ConvergenceWarning")
+def test_same_seed_gives_identical_model():
+    features = _random_features()
+    first = train_mlp(features, seed=7)
+    second = train_mlp(features, seed=7)
+    probabilities = [
+        trained.model.predict_proba(features.features)[:, 1]
+        for trained in (first, second)
+    ]
+    assert np.array_equal(*probabilities)
+    assert first.train_seconds >= 0
+
+
+def test_mlp_is_fit_on_train_rows_only(monkeypatch):
+    seen = {}
+
+    class RecordingClassifier:
+        def __init__(self, **settings):
+            seen["settings"] = settings
+
+        def fit(self, features, labels):
+            seen["rows"] = len(features)
+            seen["labels"] = len(labels)
+            return self
+
+    monkeypatch.setattr(task_c, "MLPClassifier", RecordingClassifier)
+    features = _random_features(per_split=5)
+    train_mlp(features, seed=3)
+
+    assert seen["rows"] == seen["labels"] == 5
+    assert seen["settings"]["random_state"] == 3
+
+
+def test_metrics_on_a_known_example():
+    result = classification_metrics(
+        np.array([0, 1, 1, 0]),
+        np.array([0, 1, 0, 0]),
+        np.array([0.1, 0.9, 0.4, 0.2]),
+    )
+    assert result["logical_error_rate"] == 0.25
+    assert result["balanced_accuracy"] == 0.75
+    assert result["brier_score"] == pytest.approx(0.105)
+
+
+def test_brier_score_is_not_applicable_without_probabilities():
+    result = classification_metrics(np.array([0, 1]), np.array([0, 1]))
+    assert result["brier_score"] is None
+
+
+def test_threshold_minimises_error_and_prefers_half_on_ties():
+    labels = np.array([0, 0, 1, 1])
+    assert choose_threshold(np.array([0.2, 0.4, 0.6, 0.8]), labels) == 0.5
+    assert choose_threshold(np.array([0.2, 0.3, 0.35, 0.8]), labels) == 0.35
+
+
+class _FirstBitModel:
+    """Fake model: probability 0.8 when detector 0 fired, otherwise 0.2."""
+
+    def predict_proba(self, features):
+        probability = features[:, 0] * 0.6 + 0.2
+        return np.column_stack([1 - probability, probability])
+
+
+def _first_bit_features(validation_inverted=False, test_inverted=False):
+    first_bit = np.array([0, 1] * 6, dtype=np.uint8)
+    split = np.repeat(["train", "validation", "test"], 4)
+    label = first_bit.copy()
+    if validation_inverted:
+        label[split == "validation"] ^= 1
+    if test_inverted:
+        label[split == "test"] ^= 1
+    features = np.zeros((12, 200), dtype=np.uint8)
+    features[:, 0] = first_bit
+    return TaskCFeatures(
+        example_id=np.array([f"shot-{index}" for index in range(12)]),
+        features=features,
+        label=label,
+        split=split,
+    )
+
+
+def test_threshold_is_chosen_on_validation_only():
+    trained = TrainedMLP(model=_FirstBitModel(), train_seconds=0.0)
+    base = evaluate(_first_bit_features(), trained).threshold
+    test_changed = evaluate(_first_bit_features(test_inverted=True), trained).threshold
+    validation_changed = evaluate(
+        _first_bit_features(validation_inverted=True), trained
+    ).threshold
+
+    assert base == test_changed == 0.5
+    assert validation_changed != base
+
+
+def test_evaluate_scores_mlp_and_majority_on_the_same_rows():
+    trained = TrainedMLP(model=_FirstBitModel(), train_seconds=1.5)
+    result = evaluate(_first_bit_features(), trained)
+
+    assert list(result.predictions.columns) == [
+        "example_id", "model_id", "label", "prediction", "probability", "split"
+    ]
+    assert set(result.predictions["split"]) == {"validation", "test"}
+    by_model = result.predictions.groupby("model_id")["example_id"].apply(list)
+    assert by_model["C_mlp"] == by_model["C_majority"]
+
+    test_metrics = {
+        row["model_id"]: row for row in result.metrics if row["split"] == "test"
+    }
+    assert test_metrics["C_mlp"]["logical_error_rate"] == 0.0
+    assert test_metrics["C_mlp"]["train_seconds"] == 1.5
+    assert test_metrics["C_mlp"]["n_examples"] == 4
+    assert test_metrics["C_majority"]["balanced_accuracy"] == 0.5
