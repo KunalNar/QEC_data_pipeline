@@ -21,6 +21,7 @@ from .stages.prepare_syndromes import prepare_syndromes
 from .stages.run_syndrome_qasm import run_syndrome_qasm
 from .stages.run_part1 import run_part1
 from .stages.silvergoogle import prepare_google_data
+from .stages import train as train_stage
 
 
 console = Console()
@@ -153,12 +154,12 @@ def command_run(settings: Settings) -> int:
 
 
 def command_train(_: Settings) -> int:
+    result = train_stage.run("train-" + uuid4().hex)
     console.print(
-        "[yellow]The AI/ML stage is intentionally unimplemented.[/yellow]\n"
-        "Consume the required ML input tables through the supplied helpers and "
-        "write model files and the required results/part2 files."
+        f"[green]OK[/green] Task A trained: {result.output_count:,} test predictions "
+        "recorded under results/part2/"
     )
-    return 2
+    return 0
 
 
 def parser() -> argparse.ArgumentParser:
