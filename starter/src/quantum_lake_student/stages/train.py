@@ -37,6 +37,7 @@ from quantum_lake_student.source_validation import (
     MANIFEST_OBJECT,
     read_release_manifest,
 )
+from quantum_lake_student.task_c import train_task_c
 
 
 def run(model_run_id: str) -> StageResult:
@@ -45,6 +46,9 @@ def run(model_run_id: str) -> StageResult:
 
     # Run Task A (weighted syndrome decoder)
     result_a = train_task_a(settings, run_id=model_run_id)
+
+    # Run Task C (raw-detector MLP)
+    train_task_c(settings, run_id=model_run_id)
 
     return result_a
 

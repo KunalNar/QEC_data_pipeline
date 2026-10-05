@@ -246,3 +246,55 @@ def test_evaluate_scores_mlp_and_majority_on_the_same_rows():
     assert test_metrics["C_mlp"]["train_seconds"] == 1.5
     assert test_metrics["C_mlp"]["n_examples"] == 4
     assert test_metrics["C_majority"]["balanced_accuracy"] == 0.5
+
+
+@pytest.mark.filterwarnings("ignore::sklearn.exceptions.ConvergenceWarning")
+def test_train_task_c_merges_without_touching_other_tasks(monkeypatch, tmp_path):
+    import json
+    from io import BytesIO
+
+    generator = np.random.default_rng(0)
+    rows = [
+        _row(
+            experiment,
+            shot,
+            set_bits=tuple(np.flatnonzero(generator.integers(0, 2, 200))),
+            flip=bool(shot % 3),
+        )
+        for experiment in ("d3_a", "d3_b")
+        for shot in range(20)
+    ]
+    buffer = BytesIO()
+    _table(rows).to_parquet(buffer, index=False)
+    monkeypatch.setattr(task_c, "read_lake_object", lambda *_: buffer.getvalue())
+
+    pd.DataFrame(
+        {
+            "example_id": ["s-1"],
+            "model_id": ["weighted_logistic_regression"],
+            "label": [True],
+            "prediction": [False],
+            "probability": [0.3],
+            "split": ["test"],
+        }
+    ).to_parquet(tmp_path / "predictions.parquet", index=False)
+    (tmp_path / "metrics.json").write_text(json.dumps({"task_a_syndrome_decoder": {}}))
+    (tmp_path / "run.json").write_text(json.dumps({"random_seed": 42}))
+
+    for _ in range(2):
+        result = task_c.train_task_c(None, run_id="test", results_root=tmp_path)
+
+    predictions = pd.read_parquet(tmp_path / "predictions.parquet")
+    counts = predictions["model_id"].value_counts().to_dict()
+    assert counts == {"weighted_logistic_regression": 1, "C_mlp": 20, "C_majority": 20}
+    assert set(predictions.loc[predictions["model_id"] != "weighted_logistic_regression", "split"]) == {"test"}
+    assert result.output_count == 40
+
+    metrics = json.loads((tmp_path / "metrics.json").read_text())
+    assert set(metrics) == {"task_a_syndrome_decoder", task_c.TASK_C_KEY}
+    assert metrics[task_c.TASK_C_KEY]["C_mlp"]["test_examples"] == 20
+
+    run_record = json.loads((tmp_path / "run.json").read_text())
+    assert run_record["random_seed"] == 42
+    assert run_record["feature_order"][task_c.TASK_C_KEY] == list(FEATURE_NAMES)
+    assert (tmp_path / "task_c_model.joblib").exists()

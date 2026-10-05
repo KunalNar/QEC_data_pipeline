@@ -7,15 +7,24 @@ the supplied ``data_split``.
 
 from __future__ import annotations
 
+import hashlib
+import io
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from time import perf_counter
 
+import joblib
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 from sklearn.metrics import balanced_accuracy_score, brier_score_loss
 from sklearn.neural_network import MLPClassifier
 
+from .config import Settings
+from .connections import read_lake_object
 from .ml import MODEL_SPLITS, unpack_little_endian_bits, weighted_logical_error_rate
+from .models import StageResult
 
 
 TASK_C_DISTANCE = 3
@@ -25,6 +34,12 @@ FEATURE_NAMES = tuple(f"detector_{index}" for index in range(TASK_C_DETECTOR_COU
 
 MLP_SETTINGS = {"hidden_layer_sizes": (64,), "alpha": 1.0, "max_iter": 200}
 THRESHOLD_GRID = np.round(np.arange(0.05, 0.96, 0.01), 2)
+
+# Same seed Task A records as ``random_seed`` in run.json.
+SEED = 42
+GOOGLE_ML_OBJECT = "ml/ml_google_decoder_example.parquet"
+TASK_C_KEY = "task_c_raw_detector_mlp"
+TASK_C_MODEL_IDS = ("C_mlp", "C_majority")
 
 
 @dataclass(frozen=True)
@@ -220,3 +235,110 @@ def evaluate(features: TaskCFeatures, trained: TrainedMLP) -> TaskCEvaluation:
         predictions=pd.concat(frames, ignore_index=True),
         metrics=metrics,
     )
+
+
+def _read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_json(path: Path, value: dict) -> None:
+    path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+
+
+def train_task_c(
+    settings: Settings,
+    *,
+    run_id: str,
+    results_root: Path = Path("results/part2"),
+) -> StageResult:
+    """Train Task C and merge its results into the shared results/part2/ files.
+
+    Only Task C's own rows and keys are replaced, so rerunning keeps the other
+    tasks' results and never duplicates Task C predictions.
+    """
+    result = StageResult(stage="train_task_c", run_id=run_id)
+
+    google_bytes = read_lake_object(settings, GOOGLE_ML_OBJECT)
+    google = pq.read_table(io.BytesIO(google_bytes)).to_pandas()
+
+    features = build_features(google)
+    trained = train_mlp(features, SEED)
+    evaluation = evaluate(features, trained)
+
+    results_root.mkdir(parents=True, exist_ok=True)
+    joblib.dump(trained.model, results_root / "task_c_model.joblib")
+
+    # predictions.parquet: replace only Task C's test predictions
+    task_c_predictions = evaluation.predictions[
+        evaluation.predictions["split"] == "test"
+    ]
+    predictions_path = results_root / "predictions.parquet"
+    merged = task_c_predictions
+    if predictions_path.exists():
+        existing = pd.read_parquet(predictions_path)
+        others = existing[~existing["model_id"].isin(TASK_C_MODEL_IDS)]
+        merged = pd.concat([others, task_c_predictions], ignore_index=True)
+    merged.to_parquet(predictions_path, index=False)
+
+    # metrics.json: one entry for Task C, test metrics per model
+    test_metrics = [row for row in evaluation.metrics if row["split"] == "test"]
+    metrics_path = results_root / "metrics.json"
+    metrics = _read_json(metrics_path)
+    metrics[TASK_C_KEY] = {
+        "distance": TASK_C_DISTANCE,
+        "subset": f"distance = {TASK_C_DISTANCE} AND shot_index < {TASK_C_SHOT_LIMIT}",
+        **{
+            row["model_id"]: {
+                "logical_error_rate": row["logical_error_rate"],
+                "balanced_accuracy": row["balanced_accuracy"],
+                "brier_score": row["brier_score"],
+                "training_time_seconds": row["train_seconds"],
+                "prediction_time_seconds": row["predict_seconds"],
+                "threshold": row["threshold"],
+                "test_examples": row["n_examples"],
+            }
+            for row in test_metrics
+        },
+    }
+    _write_json(metrics_path, metrics)
+
+    # run.json: add Task C's hashes, feature order, split rule, settings, timings
+    mlp_test = next(row for row in test_metrics if row["model_id"] == "C_mlp")
+    run_path = results_root / "run.json"
+    run_record = _read_json(run_path)
+    run_record.setdefault("ml_input_hashes", {})[GOOGLE_ML_OBJECT] = (
+        hashlib.sha256(google_bytes).hexdigest()
+    )
+    run_record["random_seed"] = SEED
+    run_record.setdefault("feature_order", {})[TASK_C_KEY] = list(FEATURE_NAMES)
+    run_record.setdefault("split_rules", {})[TASK_C_KEY] = (
+        "google_data_split on distance = 3 AND shot_index < 12500: odd test, "
+        "shot_index % 10 == 8 validation, other even train"
+    )
+    run_record.setdefault("timings", {}).update(
+        {
+            "task_c_training_seconds": trained.train_seconds,
+            "task_c_prediction_seconds": mlp_test["predict_seconds"],
+        }
+    )
+    run_record.setdefault("task_settings", {})[TASK_C_KEY] = {
+        "mlp_settings": {
+            **MLP_SETTINGS,
+            "hidden_layer_sizes": list(MLP_SETTINGS["hidden_layer_sizes"]),
+        },
+        "mlp_iterations": int(trained.model.n_iter_),
+        "threshold": evaluation.threshold,
+        "threshold_rule": "lowest validation error on a 0.05-0.95 grid",
+        "bit_order": "Stim b8, little-endian within each byte",
+        "rows": {
+            split: int((features.split == split).sum()) for split in MODEL_SPLITS
+        },
+    }
+    _write_json(run_path, run_record)
+
+    result.input_count = len(features.example_id)
+    result.output_count = len(task_c_predictions)
+    result.finish()
+    return result
