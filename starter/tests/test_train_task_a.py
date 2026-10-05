@@ -49,7 +49,8 @@ def test_train_task_a_execution(tmp_path: Path) -> None:
 
     # Verify baseline logical error rate is ~0.103950 (testing the fix for the previous bug)
     assert pytest.approx(base_metrics["weighted_logical_error_rate"], abs=1e-4) == 0.103950
-    assert base_metrics["brier_score"] is None
+    assert pytest.approx(base_metrics["weighted_balanced_accuracy"], abs=1e-4) == 0.5
+    assert pytest.approx(base_metrics["weighted_brier_score"], abs=1e-4) == 0.096910
 
     # Verify classifier metrics
     assert pytest.approx(clf_metrics["weighted_logical_error_rate"], abs=1e-4) == 0.104156
@@ -70,12 +71,8 @@ def test_train_task_a_execution(tmp_path: Path) -> None:
     assert run_path.exists()
     with open(run_path, "r", encoding="utf-8") as f:
         run_info = json.load(f)
-    assert run_info["data_release"] == "course-qec-v1"
+    assert run_info["data_release"]["name"] == "quantum-data-core"
+    assert run_info["code_revision"]
     assert run_info["random_seed"] == 42
     assert "task_a_syndrome_decoder" in run_info["feature_order"]
     assert len(run_info["feature_order"]["task_a_syndrome_decoder"]) == 16
-
-    # Check report.md
-    report_file = tmp_path / "report.md"
-    assert report_file.exists()
-    assert "Task A: Weighted Syndrome Decoder" in report_file.read_text(encoding="utf-8")

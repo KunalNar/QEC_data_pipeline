@@ -2,8 +2,9 @@
 
 Consume the two required ML input tables produced by Part I through the
 supplied model-input and partition helpers. Publish repeatable model files,
-predictions, metrics, run settings, the exact feature order, and the concise
-Part II report under ``results/part2/``. Numerical performance is not graded.
+predictions, metrics, run settings, and the exact feature order under
+``results/part2/``; ``report.md`` there is written by hand. Numerical
+performance is not graded.
 """
 
 from __future__ import annotations
@@ -31,6 +32,11 @@ from quantum_lake_student.ml import (
     weighted_logical_error_rate,
 )
 from quantum_lake_student.models import StageResult
+from quantum_lake_student.part1_results import code_revision
+from quantum_lake_student.source_validation import (
+    MANIFEST_OBJECT,
+    read_release_manifest,
+)
 
 
 def run(model_run_id: str) -> StageResult:
@@ -95,10 +101,21 @@ def train_task_a(
     # -------------------------------------------------------------
     # 1. Dummy prior baseline
     baseline = DummyClassifier(strategy="prior")
+    t0 = time.perf_counter()
     baseline.fit(X_train, y_train, sample_weight=w_train)
+    base_train_time = time.perf_counter() - t0
+    t0 = time.perf_counter()
     test_preds_baseline = baseline.predict(X_test)
+    test_probs_baseline = baseline.predict_proba(X_test)[:, 1]
+    base_pred_time = time.perf_counter() - t0
     base_ler_baseline = weighted_logical_error_rate(
         y_test, test_preds_baseline, w_test
+    )
+    base_balanced_acc = balanced_accuracy_score(
+        y_test, test_preds_baseline, sample_weight=w_test
+    )
+    base_brier = brier_score_loss(
+        y_test, test_probs_baseline, sample_weight=w_test
     )
 
     # 2. Weighted Logistic Regression
@@ -172,7 +189,10 @@ def train_task_a(
         "task_a_syndrome_decoder": {
             "baseline_prior": {
                 "weighted_logical_error_rate": float(base_ler_baseline),
-                "brier_score": None,
+                "weighted_balanced_accuracy": float(base_balanced_acc),
+                "weighted_brier_score": float(base_brier),
+                "training_time_seconds": float(base_train_time),
+                "prediction_time_seconds": float(base_pred_time),
             },
             "weighted_logistic_regression": {
                 "optimal_threshold": float(best_threshold),
@@ -208,7 +228,17 @@ def train_task_a(
         except Exception:
             run_record = {}
 
-    run_record.setdefault("data_release", "course-qec-v1")
+    manifest = read_release_manifest(
+        read_lake_object(settings, MANIFEST_OBJECT)
+    )
+    run_record["data_release"] = {
+        "name": manifest.get("release_name"),
+        "version": manifest.get("bundle_version"),
+        "date": manifest.get("release_date"),
+    }
+    run_record["code_revision_kind"], run_record["code_revision"] = (
+        code_revision()
+    )
     ml_input_hashes = run_record.get("ml_input_hashes", {})
     ml_input_hashes["ml/ml_syndrome_decoder_example.parquet"] = hashlib.sha256(
         syndrome_bytes
@@ -251,48 +281,6 @@ def train_task_a(
 
     with open(run_path, "w", encoding="utf-8") as f:
         json.dump(run_record, f, indent=2)
-
-    # Save / write report.md template if not already present
-    report_path = results_root / "report.md"
-    if not report_path.exists():
-        report_content = (
-            "# Part II: AI/ML Decoder Report\n\n"
-            "## Task A: Weighted Syndrome Decoder\n\n"
-            "### 1. Inputs and Targets\n"
-            "- **Dataset:** `ml/ml_syndrome_decoder_example.parquet` (75,598 aggregate rows representing 70,000,000 simulated observations).\n"
-            "- **Features ($X$):** 16 ordered binary syndrome bits (`syndrome_bits`), representing 4 consecutive rounds of 4 stabilizer checks on a surface code, extracted via `syndrome_model_input`.\n"
-            "- **Target ($y$):** `logical_error_label` (boolean indicating whether an uncorrected logical bit-flip error occurred).\n"
-            "- **Physical Weights ($w$):** `sample_weight` (integer observation count per row). Used during fitting and for all reported metrics without row expansion.\n"
-            "- **Data Splits:** Fixed physical fault rate partitions: Validation ($p = 0.0005$, 10,950 examples), Test ($p = 0.005$, 20,887 examples), Train (remaining 5 fault rates, 43,761 examples).\n\n"
-            "### 2. Model Selection and Rationale\n"
-            "- **Baseline Prior:** `DummyClassifier(strategy='prior')` fit with `sample_weight=w_train`. Reflects the weighted prior probability of logical failure without syndrome information.\n"
-            "- **Linear Classifier:** `LogisticRegression(random_state=42)` fit with `sample_weight=w_train`. Evaluates whether simple linear additive weighting over syndrome bits provides predictive signal for error detection.\n\n"
-            "### 3. Validation Tuning and Test Evaluation\n"
-            f"- **Threshold Tuning:** The classifier decision threshold was tuned exclusively on the validation set ($p=0.0005$), evaluating weighted logical error rate (LER) across thresholds in $[0.05, 0.90]$ with step $0.05$. Optimal validation threshold found: {best_threshold:.2f} (Val LER = {best_val_ler:.6f}).\n"
-            "- **Held-Out Test Results ($p=0.005$):**\n"
-            f"  - **Baseline Prior LER:** {base_ler_baseline:.6f}\n"
-            f"  - **Logistic Regression LER:** {test_ler:.6f}\n"
-            f"  - **Weighted Balanced Accuracy:** {test_balanced_acc:.4f}\n"
-            f"  - **Weighted Brier Score:** {test_brier:.6f}\n"
-            f"  - **Training Latency:** {train_time:.4f} seconds\n"
-            f"  - **Prediction Latency (20,887 rows):** {pred_time:.4f} seconds\n\n"
-            "### 4. Discarded Information and Limitations\n"
-            "The learned model exhibits virtually identical test performance to the uninformative baseline prior. Inspecting the model weights and problem physics reveals why:\n"
-            "1. **Flattening Spatio-Temporal Structure:** The 16 syndrome bits form a $4 \\times 4$ space-time grid. Logistic regression flattens this into an independent 16-element vector, ignoring temporal continuity ($t \\rightarrow t+1$ via `index % 4`) and 2D spatial adjacency on the chip.\n"
-            "2. **Measurement Noise vs. Error Percolation:** A single-round excitation that clears in subsequent rounds is a transient measurement readout glitch ($y=0$), whereas excitation persisting across rounds indicates a physical error chain ($y=1$). A purely additive linear model ($\\sum w_i X_i$) cannot evaluate multi-round temporal persistence without explicit interaction terms.\n"
-            "3. **Parity Loops and Non-Linearity:** Topological surface codes detect errors when chains form non-trivial homology loops. Determining whether a syndrome configuration forms a closed topological chain is non-linear and cannot be captured by linear hyperplanes.\n"
-            "4. **Learned Weight Interpretation:**\n"
-            "   - **Check Disparity:** Checks 0 and 2 have strong positive weights ($+1.5$ to $+2.3$), while Checks 1 and 3 are near zero. This aligns with surface code physics: Checks 0 and 2 are $Z$-type stabilizers (sensitive to bit flips, the target label), whereas Checks 1 and 3 are $X$-type stabilizers (sensitive to phase flips).\n"
-            "   - **U-Shaped Temporal Curve:** Coefficients peak in Round 1 (early errors that propagate through 3 subsequent noisy cycles) and Round 4 (late errors occurring right before readout with zero rounds left for correction).\n\n"
-            "---\n\n"
-            "## Task B: Supplied and Combined Google Decoders\n"
-            "*(To be completed by Task B team member)*\n\n"
-            "---\n\n"
-            "## Task C: Bounded Raw-Detector Prototype\n"
-            "*(To be completed by Task C team member)*\n"
-        )
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write(report_content)
 
     # -------------------------------------------------------------
     # FINISH & RETURN
