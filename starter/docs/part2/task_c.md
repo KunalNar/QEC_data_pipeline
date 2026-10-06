@@ -73,7 +73,7 @@ The 200 bits are not unrelated features. They are consistent with 25 rounds
 every round (about 0.11 against 0.16). The ML table does not state this layout explicitly,
 and the MLP is not told it. A flat vector hides:
 
-- **Time:** that bits 3, 11, 19, (do modulo 8 its all 3) are the same detector in consecutive
+- **Time:** that bits 3, 11, 19, (every 8th bit, so the same position modulo 8)  are the same detector in consecutive
   rounds. A matching decoder pairs such events: the same detector firing in
   two neighbouring rounds usually indicates a measurement error, not a real
   data error.
