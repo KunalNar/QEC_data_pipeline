@@ -4,10 +4,10 @@
 
 Task A reads only `ml/ml_syndrome_decoder_example.parquet`. Its 75,598 rows
 represent 70,000,000 simulated shots: each row is one distinct syndrome and
-label within one physical-fault-rate experiment, and `sample_weight` is the
-number of shots it stands for. The supplied `syndrome_model_input` turns each
-row into 16 binary inputs, ordered by round and then check (4 rounds × 4
-checks). A 1 means that check changed compared with the previous round. The
+label within one physical-fault-rate experiment, `sample_weight` is the
+number of shots it stands for.`syndrome_model_input` turns each
+row into 16 binary inputs ordered by round and then check (4 rounds × 4
+checks), A 1 means that check changed compared with the previous round. The
 target is `logical_error_label`: whether the logical value was flipped.
 
 The supplied split is by fault rate, so the three partitions are different
@@ -20,17 +20,16 @@ noise levels:
 | test | 0.005 | 20,887 | 10,000,000 | 10.4 % |
 
 The model is therefore tested on a noise level it did not see during
-training, and validation is a quieter regime than test.
+training.
 
 ### Why the weights matter
 
 Rows and shots are very different here. The all-zero syndrome is about 83 % of all training shots but only 7 rows,
 while the noisiest file (fault rate 0.01) supplies 93 % of the training rows
-but only 20 % of the training shots. Fitting or scoring without weights would
-mostly describe that one noisy file. Both models are therefore fitted with
+but only 20 % of the training shots. Fitting or scoring without the weights would
+mostly describe that one specific noisy file. Both models are therefore fitted with
 `sample_weight`, and every reported metric (logical-error rate, balanced
-accuracy, and Brier score) is weighted by it. The rows are never expanded
-into 70 million individual shots.
+accuracy, and Brier score) is weighted by it.
 
 ### Why these models
 
@@ -43,7 +42,7 @@ into 70 million individual shots.
   repeatable (fixed seed), and easy to inspect.
 
 The decision threshold is chosen on the validation split only, from a grid of
-0.05 to 0.90 in steps of 0.05 (the lowest weighted validation error wins). It
+0.05 to 0.90 in steps of 0.05 (the lowest weighted validation error wins) and
 is then applied once to the test split. The chosen threshold, feature order,
 split rule, seed, and timings are recorded in `run.json`.
 
@@ -52,10 +51,10 @@ split rule, seed, and timings are recorded in `run.json`.
 <!-- results:task_a -->
 
 Logistic regression does not beat the baseline on the test split. Its
-weighted logical-error rate is essentially the baseline's, and its balanced
+weighted logical-error rate is essentially the baseline's and its balanced
 accuracy is close to 0.5. The validation search ends at the top of the
-threshold grid, so the model only predicts a flip when it is very confident,
-and on the test split it almost always predicts "no flip", just like the
+threshold grid, so the model only predicts a flip when it is very confident.
+On the test split it almost always predicts "no flip", just like the
 baseline. Its probabilities do carry some information: its Brier score is
 lower than the baseline's, so it ranks risky syndromes higher. That ranking is
 not strong enough to turn into better yes/no decisions.
@@ -92,13 +91,13 @@ cannot express "one event or the other, but not both" (an exclusive-or). The
 fitted coefficients agree with this: checks 0 and 2 get large positive
 weights in every round and checks 1 and 3 get much smaller ones, so the model
 learns which checks matter but not the odd/even rule. A model that receives
-the per-check parity, or that can combine bits non-linearly, would be the
-natural next step, buy it was not required here so it was not built.
+the per-check parity or that can combine bits non-linearly would be the
+natural next step, but it was not required here so it was not built.
 
 ### Discarded information and limitations
 
-- The physical fault rate and experiment identity are not model inputs, as
-  required. The model cannot adapt to the test noise level, and the
+- The physical fault rate and experiment identity are not model inputs.
+  The model cannot adapt to the test noise level, and the
   threshold is tuned on a quieter regime (1.1 % flips) than the one it is
   tested on (10.4 %).
 - One linear model with default regularisation and a coarse threshold grid,
