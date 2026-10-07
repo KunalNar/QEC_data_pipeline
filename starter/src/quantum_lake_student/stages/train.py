@@ -33,6 +33,7 @@ from quantum_lake_student.ml import (
 )
 from quantum_lake_student.models import StageResult
 from quantum_lake_student.part1_results import code_revision
+from quantum_lake_student.part2_report import write_report
 from quantum_lake_student.source_validation import (
     MANIFEST_OBJECT,
     read_release_manifest,
@@ -49,6 +50,9 @@ def run(model_run_id: str) -> StageResult:
 
     # Run Task C (raw-detector MLP)
     train_task_c(settings, run_id=model_run_id)
+
+    # Assemble report.md from docs/part2/ and the metrics written above
+    write_report()
 
     return result_a
 
