@@ -39,6 +39,7 @@ from quantum_lake_student.source_validation import (
     read_release_manifest,
 )
 from quantum_lake_student.task_c import train_task_c
+from quantum_lake_student.task_b import train_task_b
 
 
 def run(model_run_id: str) -> StageResult:
@@ -47,6 +48,9 @@ def run(model_run_id: str) -> StageResult:
 
     # Run Task A (weighted syndrome decoder)
     result_a = train_task_a(settings, run_id=model_run_id)
+
+    # Run Task B (supplied and combined Google decoders)
+    train_task_b(settings, run_id=model_run_id)
 
     # Run Task C (raw-detector MLP)
     train_task_c(settings, run_id=model_run_id)
