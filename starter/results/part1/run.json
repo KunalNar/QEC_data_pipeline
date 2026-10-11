@@ -261,9 +261,9 @@
       }
     }
   },
-  "code_revision": "8eb91d73b4d44910f834edfbc068526ca8fafc08a45c5413c8edebfcb9a947e4",
+  "code_revision": "2a6060486aebdcce8d25f952f59f282f24ad82b028a53e356818517fe9a178d9",
   "code_revision_kind": "source_tree_sha256",
-  "finished_at": "2026-10-11T09:07:15.724675+00:00",
+  "finished_at": "2026-10-11T15:31:28.880281+00:00",
   "input_hashes": {
     "bronze/source=google_qec/google-surface-code-curated.zip": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
     "bronze/source=qasmbench/qasmbench-qec.zip": "60307f88e34b1f752b94223d6d136da72c629b4b625ac6d1c30e5e2e4f85722a",
@@ -340,7 +340,7 @@
     },
     "results/part1/trace_examples.json": {
       "rows": 2,
-      "sha256": "579b72d7d8dba6ac8339b9e680c7bace519485d07c173cc1eb0487a8f1a96b8b"
+      "sha256": "b89985c06746818a8bb64167c840e8aebf8a3bf1c76c0c8fc8062a4b018a36f5"
     },
     "silver/google_qec/experiment.parquet": {
       "rows": 5,
@@ -372,13 +372,13 @@
     "name": "quantum-data-core",
     "version": 3
   },
-  "run_id": "part1-eb72127e060741aa94b6b4eea3939f1c",
+  "run_id": "part1-05ff414a1a94441f9233718ea8cc0071",
   "scope": [
     "qec_syndromes",
     "qasmbench",
     "google_qec"
   ],
   "stage": "run_part1",
-  "started_at": "2026-10-11T09:05:03.956392+00:00",
+  "started_at": "2026-10-11T15:29:18.834973+00:00",
   "status": "complete"
 }

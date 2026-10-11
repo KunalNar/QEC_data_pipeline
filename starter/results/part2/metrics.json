@@ -1,0 +1,247 @@
+{
+  "task_a_syndrome_decoder": {
+    "baseline_prior": {
+      "weighted_logical_error_rate": 0.10395,
+      "weighted_balanced_accuracy": 0.5,
+      "weighted_brier_score": 0.09691046819962242,
+      "training_time_seconds": 0.011439512949436903,
+      "prediction_time_seconds": 0.0004557149950414896
+    },
+    "weighted_logistic_regression": {
+      "optimal_threshold": 0.9,
+      "weighted_logical_error_rate": 0.104156,
+      "weighted_balanced_accuracy": 0.5014940079461032,
+      "weighted_brier_score": 0.09095580410416895,
+      "training_time_seconds": 0.05043525202199817,
+      "prediction_time_seconds": 0.0014351689023897052
+    }
+  },
+  "task_b_supplied_and_combined_decoders": {
+    "distances": {
+      "3": {
+        "B_prior_baseline": {
+          "logical_error_rate": 0.49295,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.24995202015625007,
+          "training_time_seconds": 0.0001282289158552885,
+          "prediction_time_seconds": 0.00010022299829870462,
+          "threshold": 0.5,
+          "test_examples": 100000
+        },
+        "B_belief_matching": {
+          "logical_error_rate": 0.40133,
+          "balanced_accuracy": 0.5985358999222636,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 100000
+        },
+        "B_correlated_matching": {
+          "logical_error_rate": 0.42197,
+          "balanced_accuracy": 0.5779208474436803,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 100000
+        },
+        "B_pymatching": {
+          "logical_error_rate": 0.43636,
+          "balanced_accuracy": 0.5634564847837398,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 100000
+        },
+        "B_tensor_network": {
+          "logical_error_rate": 0.39668,
+          "balanced_accuracy": 0.6031201183107213,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 100000
+        },
+        "B_combined_logistic": {
+          "logical_error_rate": 0.39768,
+          "balanced_accuracy": 0.6018877873109953,
+          "brier_score": 0.23515219914160923,
+          "training_time_seconds": 0.06542675197124481,
+          "prediction_time_seconds": 0.0022393909748643637,
+          "threshold": 0.51,
+          "test_examples": 100000
+        }
+      },
+      "5": {
+        "B_prior_baseline": {
+          "logical_error_rate": 0.50152,
+          "balanced_accuracy": 0.5,
+          "brier_score": 0.250005088,
+          "training_time_seconds": 7.633701898157597e-05,
+          "prediction_time_seconds": 2.5841989554464817e-05,
+          "threshold": 0.5,
+          "test_examples": 25000
+        },
+        "B_belief_matching": {
+          "logical_error_rate": 0.39944,
+          "balanced_accuracy": 0.600571630242778,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 25000
+        },
+        "B_correlated_matching": {
+          "logical_error_rate": 0.4226,
+          "balanced_accuracy": 0.5774100785929823,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 25000
+        },
+        "B_pymatching": {
+          "logical_error_rate": 0.4548,
+          "balanced_accuracy": 0.5451846095780879,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 25000
+        },
+        "B_tensor_network": {
+          "logical_error_rate": 0.39524,
+          "balanced_accuracy": 0.6047613329623347,
+          "brier_score": null,
+          "training_time_seconds": null,
+          "prediction_time_seconds": null,
+          "threshold": null,
+          "test_examples": 25000
+        },
+        "B_combined_logistic": {
+          "logical_error_rate": 0.39768,
+          "balanced_accuracy": 0.6026480526322432,
+          "brier_score": 0.23406043447168412,
+          "training_time_seconds": 0.016799133038148284,
+          "prediction_time_seconds": 0.0007017649477347732,
+          "threshold": 0.55,
+          "test_examples": 25000
+        }
+      }
+    },
+    "decoder_error_overlap": {
+      "3": {
+        "decoder_error_rates": {
+          "belief_matching_prediction": 0.40133,
+          "correlated_matching_prediction": 0.42197,
+          "pymatching_prediction": 0.43636,
+          "tensor_network_contraction_prediction": 0.39668
+        },
+        "pairwise_error_overlap": {
+          "belief_matching_prediction__correlated_matching_prediction": {
+            "both_wrong": 26752,
+            "either_wrong": 55578,
+            "error_jaccard": 0.4813415380186405
+          },
+          "belief_matching_prediction__pymatching_prediction": {
+            "both_wrong": 25442,
+            "either_wrong": 58327,
+            "error_jaccard": 0.4361959298438116
+          },
+          "belief_matching_prediction__tensor_network_contraction_prediction": {
+            "both_wrong": 27770,
+            "either_wrong": 52031,
+            "error_jaccard": 0.5337202821394937
+          },
+          "correlated_matching_prediction__pymatching_prediction": {
+            "both_wrong": 29814,
+            "either_wrong": 56019,
+            "error_jaccard": 0.5322122851175494
+          },
+          "correlated_matching_prediction__tensor_network_contraction_prediction": {
+            "both_wrong": 23299,
+            "either_wrong": 58566,
+            "error_jaccard": 0.39782467643342556
+          },
+          "pymatching_prediction__tensor_network_contraction_prediction": {
+            "both_wrong": 22190,
+            "either_wrong": 61114,
+            "error_jaccard": 0.36309192656347156
+          }
+        },
+        "all_four_wrong": 14440,
+        "any_decoder_wrong": 69824,
+        "exactly_one_decoder_wrong": 19031,
+        "test_examples": 100000
+      },
+      "5": {
+        "decoder_error_rates": {
+          "belief_matching_prediction": 0.39944,
+          "correlated_matching_prediction": 0.4226,
+          "pymatching_prediction": 0.4548,
+          "tensor_network_contraction_prediction": 0.39524
+        },
+        "pairwise_error_overlap": {
+          "belief_matching_prediction__correlated_matching_prediction": {
+            "both_wrong": 6002,
+            "either_wrong": 14549,
+            "error_jaccard": 0.4125369441198708
+          },
+          "belief_matching_prediction__pymatching_prediction": {
+            "both_wrong": 5762,
+            "either_wrong": 15594,
+            "error_jaccard": 0.3695010901628832
+          },
+          "belief_matching_prediction__tensor_network_contraction_prediction": {
+            "both_wrong": 6524,
+            "either_wrong": 13343,
+            "error_jaccard": 0.48894551450198603
+          },
+          "correlated_matching_prediction__pymatching_prediction": {
+            "both_wrong": 6381,
+            "either_wrong": 15554,
+            "error_jaccard": 0.41024816767391026
+          },
+          "correlated_matching_prediction__tensor_network_contraction_prediction": {
+            "both_wrong": 5552,
+            "either_wrong": 14894,
+            "error_jaccard": 0.3727675574056667
+          },
+          "pymatching_prediction__tensor_network_contraction_prediction": {
+            "both_wrong": 5305,
+            "either_wrong": 15946,
+            "error_jaccard": 0.3326853129311426
+          }
+        },
+        "all_four_wrong": 2713,
+        "any_decoder_wrong": 18908,
+        "exactly_one_decoder_wrong": 5933,
+        "test_examples": 25000
+      }
+    }
+  },
+  "task_c_raw_detector_mlp": {
+    "distance": 3,
+    "subset": "distance = 3 AND shot_index < 12500",
+    "C_mlp": {
+      "logical_error_rate": 0.50024,
+      "balanced_accuracy": 0.4998393215958866,
+      "brier_score": 0.2558119439816424,
+      "training_time_seconds": 8.491790059022605,
+      "prediction_time_seconds": 0.030091745080426335,
+      "threshold": 0.71,
+      "test_examples": 25000
+    },
+    "C_majority": {
+      "logical_error_rate": 0.50008,
+      "balanced_accuracy": 0.5,
+      "brier_score": 0.2500131705,
+      "training_time_seconds": 0.002375790965743363,
+      "prediction_time_seconds": 1.6622012481093407e-05,
+      "threshold": 0.5,
+      "test_examples": 25000
+    }
+  }
+}
