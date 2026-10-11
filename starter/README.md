@@ -17,11 +17,22 @@ Read these documents in order:
 9. `../assignment/part-2-ai-ml.md`
 10. `../assignment/rubric.md`
 
-The starter deliberately does not contain domain transformations, target
-business tables, feature builders, or fitted models. `make check` verifies
-connections, `make inventory` lists the three Bronze objects, and `make test`
-checks low-level utilities. `make run` and `make train` stop at separate
-unimplemented boundaries; replace both with your orchestrated stages.
+Our [Gold schema design](docs/gold-schema.md) records all three source models.
+After producing syndrome Silver, `make gold-syndromes` loads its three Gold
+tables into PostgreSQL. `make ml-syndromes` exports the syndrome ML handoff
+from Gold. `make gold-qasmbench` loads the QASMBench circuit relationships.
+`make gold-google` loads Google shots and decoder predictions, and
+`make ml-google` exports the Google ML handoff. `make run` rebuilds all three
+sources, loads Gold in one transaction, exports both ML tables, and writes
+the complete evidence under `results/part1/`; see the
+[Part I report](docs/report_parta.md).
+
+`make check` verifies connections, `make inventory` lists the three Bronze
+objects, and `make test` runs the automated checks. `make train` runs Part II
+Tasks A, B, and C and creates fitted models, predictions, metrics, run settings,
+and the report under `results/part2/`. Afterwards, `make trace-examples`
+connects saved predictions to their Part I source records. Run these commands
+from `starter/` inside the workspace container.
 
 Suggested source layout:
 
@@ -50,9 +61,11 @@ the assignment.
 inputs, partition loading, and weighted LER. It does not select models, perform
 training, or interpret results. Those remain required Part II work.
 
-Generated data, reports, credentials, and notebook outputs should not be
-committed to version control. Write required run evidence and outputs under the
-`results/part1/` and `results/part2/` layout described in the brief.
+Required Silver and ML submission snapshots are tracked under
+[`lake/`](lake/README.md), together with the final `results/part1/` evidence.
+Raw archives, credentials, database volumes, temporary outputs, and notebook
+outputs remain untracked. Part II results use the separate `results/part2/`
+layout described in the brief.
 
 The AI/ML stage is a downstream consumer check. A particular model score or an
 improvement over a supplied decoder is not part of the grade.

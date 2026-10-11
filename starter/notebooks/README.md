@@ -4,6 +4,10 @@ Use notebooks for exploration, profiling, and visual checks. Production
 transformations must live in importable modules under `src/` and be callable
 without executing notebook cells.
 
+The source-discovery notebooks are `syndrome_data_discovery.ipynb`,
+`qasmbench_data_discovery.ipynb`, and `google_qec_data_discovery.ipynb`.
+Automated checks belong in `tests/*.py` and run with `make test`.
+
 Recommended first notebook sections:
 
 1. Bronze object and archive-member inventory;

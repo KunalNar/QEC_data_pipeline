@@ -14,7 +14,18 @@ mc mb --ignore-existing "$alias_name/$bucket"
 mc version enable "$alias_name/$bucket" >/dev/null
 mc anonymous set none "$alias_name/$bucket" >/dev/null
 
-mc mirror --overwrite /seed/raw "$alias_name/$bucket/bronze"
+for archive in \
+  source=qasmbench/qasmbench-qec.zip \
+  source=qec_syndromes/syndromes_dataset.zip \
+  source=google_qec/google-surface-code-curated.zip
+do
+  source_file="/seed/raw/$archive"
+  if [ ! -f "$source_file" ]; then
+    echo "Missing course archive: $source_file" >&2
+    exit 1
+  fi
+  mc cp "$source_file" "$alias_name/$bucket/bronze/$archive"
+done
 mc mirror --overwrite /seed/metadata "$alias_name/$bucket/metadata/course-release"
 
 echo "Copied the unchanged course inputs to $alias_name/$bucket."

@@ -2,15 +2,25 @@
 
 PYTHON ?= python
 
-.PHONY: help check inventory run train test
+.PHONY: help check inventory syndromes qasmbench google gold-syndromes gold-qasmbench gold-google ml-syndromes ml-google run-syndrome-qasm run train trace-examples test
 
 help:
 	@echo "Student pipeline commands"
 	@echo ""
 	@echo "  make check      Verify object-store and PostgreSQL connections"
 	@echo "  make inventory  List the supplied course data files"
-	@echo "  make run        Run your pipeline after implementing the stages"
+	@echo "  make syndromes   Build the syndrome Silver and evidence tables"
+	@echo "  make qasmbench   Build the QASMBench Silver and evidence tables"
+	@echo "  make google      Build the Google QEC Silver and evidence tables"
+	@echo "  make gold-syndromes  Load the chosen syndrome Gold tables into PostgreSQL"
+	@echo "  make gold-qasmbench  Load QASMBench circuit Gold tables into PostgreSQL"
+	@echo "  make gold-google  Load Google experiment, shot, and prediction Gold tables"
+	@echo "  make ml-syndromes    Export the syndrome ML table from PostgreSQL Gold"
+	@echo "  make ml-google      Export the Google ML table from PostgreSQL Gold"
+	@echo "  make run-syndrome-qasm  Rebuild both sources through Gold and syndrome ML"
+	@echo "  make run        Run the full three-source Part I pipeline"
 	@echo "  make train      Train/evaluate models from the required ML input tables"
+	@echo "  make trace-examples  Trace saved syndrome and Google test predictions to Bronze"
 	@echo "  make test       Run automated tests"
 
 check:
@@ -19,11 +29,41 @@ check:
 inventory:
 	$(PYTHON) -m quantum_lake_student.cli inventory
 
+syndromes:
+	$(PYTHON) -m quantum_lake_student.cli prepare-syndromes
+
+qasmbench:
+	$(PYTHON) -m quantum_lake_student.cli prepare-qasmbench
+
+google:
+	$(PYTHON) -m quantum_lake_student.cli prepare-google
+
+gold-syndromes:
+	$(PYTHON) -m quantum_lake_student.cli load-syndromes-gold
+
+gold-qasmbench:
+	$(PYTHON) -m quantum_lake_student.cli load-qasmbench-gold
+
+gold-google:
+	$(PYTHON) -m quantum_lake_student.cli load-google-gold
+
+ml-syndromes:
+	$(PYTHON) -m quantum_lake_student.cli build-ml-syndromes
+
+ml-google:
+	$(PYTHON) -m quantum_lake_student.cli build-ml-google
+
+run-syndrome-qasm:
+	$(PYTHON) -m quantum_lake_student.cli run-syndrome-qasm
+
 run:
 	$(PYTHON) -m quantum_lake_student.cli run
 
 train:
 	$(PYTHON) -m quantum_lake_student.cli train
+
+trace-examples:
+	$(PYTHON) -m quantum_lake_student.cli trace-examples
 
 test:
 	$(PYTHON) -m pytest

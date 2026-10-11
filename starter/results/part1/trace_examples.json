@@ -1,0 +1,159 @@
+{
+  "google_qec": {
+    "bronze_sources": [
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/detection_events.b8",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;byte_offset=327225;byte_length=25",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/measurements.b8",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;byte_offset=353403;byte_length=27",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/obs_flips_actual.01",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;line=13090",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/obs_flips_predicted_by_belief_matching.01",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;line=13090",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/obs_flips_predicted_by_correlated_matching.01",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;line=13090",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/obs_flips_predicted_by_pymatching.01",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;line=13090",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/obs_flips_predicted_by_tensor_network_contraction.01",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;line=13090",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      },
+      {
+        "archive_member": "surface_code_bX_d3_r25_center_7_5/sweep.b8",
+        "bronze_object": "bronze/source=google_qec/google-surface-code-curated.zip",
+        "input_sha256": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+        "record_locator": "shot=13089;byte_offset=26178;byte_length=2",
+        "source_name": "google_qec",
+        "source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9"
+      }
+    ],
+    "example_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9",
+    "experiment_id": "surface_code_bX_d3_r25_center_7_5",
+    "gold_source_record_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9",
+    "ml_data_split": "test",
+    "prediction": {
+      "example_id": "google-0000dad3168187cdd89d11a67d6eeaf0288e0d180dc2ac2bf8854dee055254f9",
+      "label": true,
+      "model_id": "B_belief_matching",
+      "prediction": true,
+      "probability": null,
+      "split": "test"
+    },
+    "shot_index": 13089
+  },
+  "part2_evidence": {
+    "predictions_sha256": "d6bc80de21f7b941bad12e8e2ded5be2f9854529b7e7eea922a940ec76ac0343",
+    "run_sha256": "1396f2c8936e050913d945296b72869c2eacb96b811ccce92b22eb7296844b14"
+  },
+  "qasmbench": {
+    "circuit": {
+      "archive_member": "small/qec_sm_n5/qec_sm_n5.qasm",
+      "bronze_object": "bronze/source=qasmbench/qasmbench-qec.zip",
+      "input_sha256": "60307f88e34b1f752b94223d6d136da72c629b4b625ac6d1c30e5e2e4f85722a",
+      "record_locator": "qasm_member",
+      "source_name": "qasmbench",
+      "source_record_id": "qasm-circuit-source-e9cd20d3f1ef46f9a79493e4f2622a13800d78111e955cde2dedb528afcb71bf"
+    },
+    "circuit_id": "qasm-circuit-3a70b93fda2af18091c0ae8f8662b71fd8d610a23d823b4b80b7e90d30ad21d4",
+    "conditional_correction": {
+      "condition_register": "syn",
+      "condition_value": 1,
+      "gate": "x",
+      "source": {
+        "archive_member": "small/qec_sm_n5/qec_sm_n5.qasm",
+        "bronze_object": "bronze/source=qasmbench/qasmbench-qec.zip",
+        "input_sha256": "60307f88e34b1f752b94223d6d136da72c629b4b625ac6d1c30e5e2e4f85722a",
+        "record_locator": "qasm_line=17",
+        "source_name": "qasmbench",
+        "source_record_id": "qasm-correction-source-6e213a2a040e5b2ac1a2c74da900df0e9c00548680687730dbac1739176f2c55"
+      },
+      "target_qubit": "q[0]"
+    },
+    "stabilizer_check": {
+      "ancilla_qubit": "a[0]",
+      "check_id": "qasm-check-36374c8ee421c760e4e18c7f1d8080273ddb735959e3b9eae18286258ed6b821",
+      "source": {
+        "archive_member": "small/qec_sm_n5/qec_sm_n5.qasm",
+        "bronze_object": "bronze/source=qasmbench/qasmbench-qec.zip",
+        "input_sha256": "60307f88e34b1f752b94223d6d136da72c629b4b625ac6d1c30e5e2e4f85722a",
+        "record_locator": "qasm_lines=10,15,16",
+        "source_name": "qasmbench",
+        "source_record_id": "qasm-check-source-f2b4bc58f8ca899922e59d311d18dbfddd285912ad16c0fdff099b50e892e398"
+      },
+      "syndrome_bit": "syn[0]"
+    }
+  },
+  "scope": "all_three_sources",
+  "syndrome": {
+    "bronze_sources": [
+      {
+        "archive_member": "d-3_pfr-0.005000_nb-10M.csv",
+        "bronze_object": "bronze/source=qec_syndromes/syndromes_dataset.zip",
+        "input_sha256": "bdfce36a71f04295ac78fb372d9c2e381801c05e3be119f919750ef59026d072",
+        "record_locator": "csv_data_row=18222",
+        "source_name": "qec_syndromes",
+        "source_record_id": "qec-syn-c89e07f7e0ac4dce5647dae4d86b3fc783ec26693d1dd6854b017dcb4242d32b"
+      }
+    ],
+    "example_id": "ml-syn-00049a112d18cc831f6376425b4c36a244223804aecf4716f4d6d6e634cf2ef0",
+    "experiment_id": "qec-exp-b7b0a470bdcaa95da2e5e872beababdf3dcc0dda5e5e4261e1978e62729daf4b",
+    "gold_observations": [
+      {
+        "quantity": 1,
+        "source_record_id": "qec-syn-c89e07f7e0ac4dce5647dae4d86b3fc783ec26693d1dd6854b017dcb4242d32b",
+        "syndrome_hex": "01010100000000000001000100000001"
+      }
+    ],
+    "logical_error_label": false,
+    "ml_data_split": "test",
+    "ml_syndrome_hex": "01010100000000000001000100000001",
+    "prediction": {
+      "example_id": "ml-syn-00049a112d18cc831f6376425b4c36a244223804aecf4716f4d6d6e634cf2ef0",
+      "label": false,
+      "model_id": "weighted_logistic_regression",
+      "prediction": false,
+      "probability": 0.6391525919420686,
+      "split": "test"
+    },
+    "sample_weight": 1
+  }
+}

@@ -1,7 +1,14 @@
-# Force LF line endings for files that execute inside Linux containers.
-# Windows checkouts default to CRLF, which breaks shebang-based scripts
-# (e.g. "set -eu\r" is parsed as an invalid option).
+# Force LF for files executed inside Linux containers, including Windows checkouts.
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.Dockerfile text eol=lf
 Makefile text eol=lf
+
+# Preserve exact submission bytes so the run-record hashes survive checkout.
+starter/lake/**/*.parquet -text
+starter/results/part1/*.parquet -text
+starter/results/part1/*.json -text
+starter/results/part1/analysis/*.csv -text whitespace=cr-at-eol
+starter/results/part2/*.parquet -text
+starter/results/part2/*.json -text
+starter/results/part2/*.joblib -text

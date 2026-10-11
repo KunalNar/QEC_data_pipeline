@@ -6,7 +6,6 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import StrEnum
 from typing import Any
 
 
@@ -20,22 +19,6 @@ def stable_record_hash(value: Any) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
-
-
-class Severity(StrEnum):
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-
-
-@dataclass(frozen=True)
-class QualityFinding:
-    rule_id: str
-    severity: Severity
-    source_system: str
-    source_record_locator: str
-    message: str
-    observed_value: str | None = None
 
 
 @dataclass
