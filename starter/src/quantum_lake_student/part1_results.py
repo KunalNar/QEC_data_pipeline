@@ -49,6 +49,7 @@ def code_revision() -> tuple[str, str]:
     for source_path in sorted(
         path for path in package_root.rglob("*")
         if path.suffix in {".py", ".sql"}
+        and ".ipynb_checkpoints" not in path.parts
     ):
         relative_path = source_path.relative_to(package_root).as_posix()
         hasher.update(relative_path.encode("utf-8"))

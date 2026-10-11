@@ -7,7 +7,24 @@ import pyarrow.parquet as pq
 import pytest
 
 from quantum_lake_student.evidence import SOURCE_TRACE_SCHEMA
+from quantum_lake_student import part1_results
 from quantum_lake_student.stages import run_part1 as stage
+
+
+def test_source_revision_ignores_jupyter_checkpoints(tmp_path, monkeypatch):
+    monkeypatch.delenv("CODE_REVISION", raising=False)
+    monkeypatch.setattr(part1_results, "__file__", str(tmp_path / "part1_results.py"))
+    source = tmp_path / "pipeline.py"
+    source.write_text("value = 1\n")
+    original_revision = part1_results.code_revision()
+
+    checkpoints = tmp_path / ".ipynb_checkpoints"
+    checkpoints.mkdir()
+    (checkpoints / "pipeline-checkpoint.py").write_text("value = 0\n")
+    assert part1_results.code_revision() == original_revision
+
+    source.write_text("value = 2\n")
+    assert part1_results.code_revision() != original_revision
 
 
 class Transaction:
