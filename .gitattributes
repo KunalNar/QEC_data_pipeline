@@ -1,3 +1,9 @@
+# Force LF for files executed inside Linux containers, including Windows checkouts.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf
+Makefile text eol=lf
+
 # Preserve exact submission bytes so the run-record hashes survive checkout.
 starter/lake/**/*.parquet -text
 starter/results/part1/*.parquet -text
