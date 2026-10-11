@@ -40,13 +40,37 @@ from quantum_lake_student.source_validation import (
     MANIFEST_OBJECT,
     read_release_manifest,
 )
+from quantum_lake_student.stages.build_google_ml_table import (
+    GOOGLE_ML_OBJECT,
+    GOOGLE_ML_SCHEMA,
+)
+from quantum_lake_student.stages.build_ml_tables import (
+    SYNDROME_ML_OBJECT,
+    SYNDROME_ML_SCHEMA,
+)
 from quantum_lake_student.task_c import train_task_c
 from quantum_lake_student.task_b import train_task_b
+
+
+def validate_ml_input_schemas(settings: Settings) -> None:
+    """Check both existing Arrow contracts before any task starts fitting."""
+    for object_name, expected_schema in (
+        (SYNDROME_ML_OBJECT, SYNDROME_ML_SCHEMA),
+        (GOOGLE_ML_OBJECT, GOOGLE_ML_SCHEMA),
+    ):
+        data = read_lake_object(settings, object_name)
+        actual_schema = pq.read_schema(io.BytesIO(data))
+        if not actual_schema.equals(expected_schema, check_metadata=False):
+            raise ValueError(
+                f"ML input schema mismatch for {object_name}: "
+                f"expected {expected_schema}, found {actual_schema}"
+            )
 
 
 def run(model_run_id: str) -> StageResult:
     """Main Part II training orchestrator called by `make train`."""
     settings = Settings.from_environment()
+    validate_ml_input_schemas(settings)
 
     # Run Task A (weighted syndrome decoder)
     result_a = train_task_a(settings, run_id=model_run_id)

@@ -22,7 +22,7 @@ feature preparation. `n/a` means not applicable.
 
 - Data release: quantum-data-core version 3 (2026-08-05)
 - Random seed: 42
-- Code revision (source_tree_sha256): `2a6060486aeb`
+- Code revision (source_tree_sha256): `02fdc1b53f68`
 - ML input hashes (SHA-256):
   - `ml/ml_google_decoder_example.parquet`: `e8332a2d979d`
   - `ml/ml_syndrome_decoder_example.parquet`: `05abd4a78717`
@@ -82,8 +82,8 @@ split rule, seed, and timings are recorded in `run.json`.
 
 | Model | Distance | Logical-error rate | Balanced accuracy | Brier score | Training s | Prediction s | Threshold |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `baseline_prior` | n/a | 0.1040 | 0.5000 | 0.0969 | 0.0114 | 0.0005 | n/a |
-| `weighted_logistic_regression` | n/a | 0.1042 | 0.5015 | 0.0910 | 0.0504 | 0.0014 | 0.90 |
+| `baseline_prior` | n/a | 0.1040 | 0.5000 | 0.0969 | 0.0120 | 0.0003 | n/a |
+| `weighted_logistic_regression` | n/a | 0.1042 | 0.5015 | 0.0910 | 0.3081 | 0.0013 | 0.90 |
 
 Test split. Rates, balanced accuracy, and Brier score are weighted by `sample_weight`.
 
@@ -190,18 +190,18 @@ on the validation split from a fixed 0.05–0.95 grid.
 
 | Model | Distance | Logical-error rate | Balanced accuracy | Brier score | Training s | Prediction s | Threshold |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `B_prior_baseline` | 3 | 0.4929 | 0.5000 | 0.2500 | 0.0001 | 0.0001 | 0.50 |
+| `B_prior_baseline` | 3 | 0.4929 | 0.5000 | 0.2500 | 0.0001 | <0.0001 | 0.50 |
 | `B_belief_matching` | 3 | 0.4013 | 0.5985 | n/a | n/a | n/a | n/a |
 | `B_correlated_matching` | 3 | 0.4220 | 0.5779 | n/a | n/a | n/a | n/a |
 | `B_pymatching` | 3 | 0.4364 | 0.5635 | n/a | n/a | n/a | n/a |
 | `B_tensor_network` | 3 | 0.3967 | 0.6031 | n/a | n/a | n/a | n/a |
-| `B_combined_logistic` | 3 | 0.3977 | 0.6019 | 0.2352 | 0.0654 | 0.0022 | 0.51 |
+| `B_combined_logistic` | 3 | 0.3977 | 0.6019 | 0.2352 | 0.0746 | 0.0053 | 0.51 |
 | `B_prior_baseline` | 5 | 0.5015 | 0.5000 | 0.2500 | <0.0001 | <0.0001 | 0.50 |
 | `B_belief_matching` | 5 | 0.3994 | 0.6006 | n/a | n/a | n/a | n/a |
 | `B_correlated_matching` | 5 | 0.4226 | 0.5774 | n/a | n/a | n/a | n/a |
 | `B_pymatching` | 5 | 0.4548 | 0.5452 | n/a | n/a | n/a | n/a |
 | `B_tensor_network` | 5 | 0.3952 | 0.6048 | n/a | n/a | n/a | n/a |
-| `B_combined_logistic` | 5 | 0.3977 | 0.6026 | 0.2341 | 0.0168 | 0.0007 | 0.55 |
+| `B_combined_logistic` | 5 | 0.3977 | 0.6026 | 0.2341 | 0.0202 | 0.0007 | 0.55 |
 
 Test split.
 
@@ -312,8 +312,8 @@ timings of each run are recorded in `run.json`.
 
 | Model | Distance | Logical-error rate | Balanced accuracy | Brier score | Training s | Prediction s | Threshold |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `C_mlp` | 3 | 0.5002 | 0.4998 | 0.2558 | 8.49 | 0.0301 | 0.71 |
-| `C_majority` | 3 | 0.5001 | 0.5000 | 0.2500 | 0.0024 | <0.0001 | 0.50 |
+| `C_mlp` | 3 | 0.5002 | 0.4998 | 0.2558 | 12.04 | 0.0230 | 0.71 |
+| `C_majority` | 3 | 0.5001 | 0.5000 | 0.2500 | 0.0030 | <0.0001 | 0.50 |
 
 Test split.
 

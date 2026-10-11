@@ -5,7 +5,7 @@
     "date": "2026-08-05"
   },
   "code_revision_kind": "source_tree_sha256",
-  "code_revision": "2a6060486aebdcce8d25f952f59f282f24ad82b028a53e356818517fe9a178d9",
+  "code_revision": "02fdc1b53f68d1d9244b7f8792e9a309bb6f2ef6996c2a338e06bc67397434b6",
   "ml_input_hashes": {
     "ml/ml_syndrome_decoder_example.parquet": "05abd4a787176222c3b13a58fbf02b32d856e8c4ecb92df50dfa563a7791bcc2",
     "ml/ml_google_decoder_example.parquet": "e8332a2d979dde9b557a3aaeecaf58f0fac08d5ee5d277bb7498db937a1719db"
@@ -246,24 +246,24 @@
     "task_c_raw_detector_mlp": "google_data_split on distance = 3 AND shot_index < 12500: odd test, shot_index % 10 == 8 validation, other even train"
   },
   "timings": {
-    "task_a_training_seconds": 0.05043525202199817,
-    "task_a_prediction_seconds": 0.0014351689023897052,
+    "task_a_training_seconds": 0.30806336901150644,
+    "task_a_prediction_seconds": 0.0012637090403586626,
     "task_b_supplied_and_combined_decoders": {
       "3": {
-        "prior_baseline_training_seconds": 0.0001282289158552885,
-        "prior_baseline_prediction_seconds": 0.00010022299829870462,
-        "combined_training_seconds": 0.06542675197124481,
-        "combined_prediction_seconds": 0.0022393909748643637
+        "prior_baseline_training_seconds": 0.0001169140450656414,
+        "prior_baseline_prediction_seconds": 7.444992661476135e-05,
+        "combined_training_seconds": 0.07457474991679192,
+        "combined_prediction_seconds": 0.005257165990769863
       },
       "5": {
-        "prior_baseline_training_seconds": 7.633701898157597e-05,
-        "prior_baseline_prediction_seconds": 2.5841989554464817e-05,
-        "combined_training_seconds": 0.016799133038148284,
-        "combined_prediction_seconds": 0.0007017649477347732
+        "prior_baseline_training_seconds": 7.144804112613201e-05,
+        "prior_baseline_prediction_seconds": 2.5281915441155434e-05,
+        "combined_training_seconds": 0.02021920308470726,
+        "combined_prediction_seconds": 0.0006692899623885751
       }
     },
-    "task_c_training_seconds": 8.491790059022605,
-    "task_c_prediction_seconds": 0.030091745080426335
+    "task_c_training_seconds": 12.038004833040759,
+    "task_c_prediction_seconds": 0.0229696249589324
   },
   "dependency_versions": {
     "scikit-learn": "1.9.0",

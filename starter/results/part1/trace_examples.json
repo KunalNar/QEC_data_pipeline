@@ -81,8 +81,8 @@
     "shot_index": 13089
   },
   "part2_evidence": {
-    "predictions_sha256": "17c8ff9a0105d26b405037e5fcef4328812373e48d1bc7756c89deeb84fb491c",
-    "run_sha256": "c73045dd472545e6043b59ac4a0b5ec7ab7100203e8cc5e1dd05dbdd921ac815"
+    "predictions_sha256": "d6bc80de21f7b941bad12e8e2ded5be2f9854529b7e7eea922a940ec76ac0343",
+    "run_sha256": "1396f2c8936e050913d945296b72869c2eacb96b811ccce92b22eb7296844b14"
   },
   "qasmbench": {
     "circuit": {
@@ -151,7 +151,7 @@
       "label": false,
       "model_id": "weighted_logistic_regression",
       "prediction": false,
-      "probability": 0.6391525919420675,
+      "probability": 0.6391525919420686,
       "split": "test"
     },
     "sample_weight": 1
