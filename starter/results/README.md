@@ -28,5 +28,11 @@ snapshots. The six Silver and two ML table snapshots are under
 `run.json`. Refresh the table snapshots from those same object-store outputs
 before committing a new run; their SHA-256 values must match `run.json`.
 
+The trace command selects one saved test prediction per dataset and checks the
+recorded ML hashes, labels, splits, and Bronze hashes before replacing the
+examples. It does not train models. Repeat it after regenerating Part I or the
+predictions, because `make run` initially writes ML-to-Bronze examples without
+model predictions.
+
 Part II outputs, older scoped checkpoints, temporary files, course archives,
 credentials, and database volumes remain outside this commit.

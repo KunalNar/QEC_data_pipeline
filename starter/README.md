@@ -26,8 +26,6 @@ from Gold. `make gold-qasmbench` loads the QASMBench circuit relationships.
 sources, loads Gold in one transaction, exports both ML tables, and writes
 the complete evidence under `results/part1/`; see the
 [Part I report](docs/report_parta.md).
-The [Part II handoff](docs/part2-handoff.md) summarizes the available data
-products for the ML team.
 
 `make check` verifies connections, `make inventory` lists the three Bronze
 objects, and `make test` runs the automated checks. Part II `make train`
