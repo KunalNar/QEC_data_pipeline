@@ -87,16 +87,26 @@ def _analysis_outputs(
     return outputs
 
 
-def _trace_example(settings: Settings, root: Path) -> dict[str, object]:
+def _trace_example(
+    settings: Settings,
+    root: Path,
+    example_id: str | None = None,
+) -> dict[str, object]:
     ml_table = pq.read_table(BytesIO(read_lake_object(settings, SYNDROME_ML_OBJECT)))
     ml_examples = {row["example_id"]: row for row in ml_table.to_pylist()}
 
     with postgres_connection(settings) as connection:
         connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-        example_id, experiment_id, label, weight = connection.execute(
+        example = connection.execute(
             "SELECT example_id, experiment_id, logical_error_label, sample_weight "
-            "FROM gold.syndrome_ml_example ORDER BY example_id LIMIT 1"
+            "FROM gold.syndrome_ml_example "
+            "WHERE (%s::text IS NULL OR example_id = %s) "
+            "ORDER BY example_id LIMIT 1",
+            (example_id, example_id),
         ).fetchone()
+        if example is None:
+            raise RuntimeError("Syndrome prediction has no Gold ML example")
+        example_id, experiment_id, label, weight = example
         observations = [
             {
                 "source_record_id": source_id,
@@ -156,6 +166,10 @@ def _trace_example(settings: Settings, root: Path) -> dict[str, object]:
     if (
         not source_ids
         or sum(row["quantity"] for row in observations) != weight
+        or any(
+            row["syndrome_hex"] != ml_row["syndrome_bits"].hex()
+            for row in observations
+        )
         or any(source_id not in trace_by_id for source_id in selected_ids)
     ):
         raise RuntimeError("Gold source row missing from scoped source trace")

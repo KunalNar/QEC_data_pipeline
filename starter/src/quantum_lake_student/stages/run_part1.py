@@ -103,8 +103,14 @@ def _trace_count(root: Path, expected_ids: set[str], google_rows: GoogleGoldRows
     return trace.num_rows
 
 
-def _google_trace_example(settings: Settings, root: Path) -> dict[str, object]:
+def _google_trace_example(
+    settings: Settings,
+    root: Path,
+    example_id: str | None = None,
+) -> dict[str, object]:
     ml = pq.read_table(BytesIO(read_lake_object(settings, GOOGLE_ML_OBJECT)))
+    if example_id is not None:
+        ml = ml.filter(pc.equal(ml["example_id"], example_id))
     if not ml.num_rows:
         raise RuntimeError("Google ML table is empty")
     example = ml.slice(0, 1).to_pylist()[0]
@@ -113,7 +119,8 @@ def _google_trace_example(settings: Settings, root: Path) -> dict[str, object]:
         connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
         gold_row = connection.execute(
             "SELECT s.source_record_id, s.experiment_id, s.shot_index, "
-            "e.distance, s.detector_event_count, encode(s.detector_bits, 'hex') "
+            "e.distance, s.detector_event_count, encode(s.detector_bits, 'hex'), "
+            "s.actual_observable_flip "
             "FROM gold.google_shot AS s "
             "JOIN gold.google_experiment AS e USING (experiment_id) "
             "WHERE s.source_record_id = %s",
@@ -130,13 +137,17 @@ def _google_trace_example(settings: Settings, root: Path) -> dict[str, object]:
         or gold_row[3] != example["distance"]
         or gold_row[4] != example["detector_event_count"]
         or gold_row[5] != example["detector_bits"].hex()
+        or gold_row[6] != example["actual_observable_flip"]
     ):
         raise RuntimeError("Google ML example does not resolve to its Gold shot")
     source_rows = pq.read_table(
         root / "source_trace.parquet",
         filters=[("source_record_id", "=", example_id)],
     ).to_pylist()
-    if len(source_rows) != SHOT_TRACE_MEMBER_COUNT:
+    if (
+        len(source_rows) != SHOT_TRACE_MEMBER_COUNT
+        or len({row["archive_member"] for row in source_rows}) != SHOT_TRACE_MEMBER_COUNT
+    ):
         raise RuntimeError("Google Gold shot lacks companion-file trace rows")
     return {
         "example_id": example_id,

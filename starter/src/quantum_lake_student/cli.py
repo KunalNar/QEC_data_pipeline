@@ -13,6 +13,7 @@ from .config import Settings
 from .connections import bronze_inventory, check_platform
 from .stages.build_ml_tables import build_syndrome_ml_table
 from .stages.build_google_ml_table import build_google_ml_table
+from .stages.complete_traces import complete_traces
 from .stages.load_postgres import load_syndromes_gold
 from .stages.load_postgres_google import load_google_gold
 from .stages.load_qasmbench_gold import load_qasmbench_gold
@@ -161,6 +162,12 @@ def command_train(_: Settings) -> int:
     return 2
 
 
+def command_trace_examples(settings: Settings) -> int:
+    complete_traces(settings)
+    console.print("[green]OK[/green] saved syndrome and Google prediction-to-Bronze traces")
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument(
@@ -179,6 +186,7 @@ def parser() -> argparse.ArgumentParser:
             "run-syndrome-qasm",
             "run",
             "train",
+            "trace-examples",
         ),
         help="Action to perform",
     )
@@ -202,6 +210,7 @@ def main() -> None:
         "run-syndrome-qasm": command_run_syndrome_qasm,
         "run": command_run,
         "train": command_train,
+        "trace-examples": command_trace_examples,
     }
     raise SystemExit(commands[arguments.command](settings))
 

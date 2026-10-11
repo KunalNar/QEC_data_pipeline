@@ -2,7 +2,7 @@
 
 PYTHON ?= python
 
-.PHONY: help check inventory syndromes qasmbench google gold-syndromes gold-qasmbench gold-google ml-syndromes ml-google run-syndrome-qasm run train test
+.PHONY: help check inventory syndromes qasmbench google gold-syndromes gold-qasmbench gold-google ml-syndromes ml-google run-syndrome-qasm run train trace-examples test
 
 help:
 	@echo "Student pipeline commands"
@@ -20,6 +20,7 @@ help:
 	@echo "  make run-syndrome-qasm  Rebuild both sources through Gold and syndrome ML"
 	@echo "  make run        Run the full three-source Part I pipeline"
 	@echo "  make train      Train/evaluate models from the required ML input tables"
+	@echo "  make trace-examples  Trace saved syndrome and Google test predictions to Bronze"
 	@echo "  make test       Run automated tests"
 
 check:
@@ -60,6 +61,9 @@ run:
 
 train:
 	$(PYTHON) -m quantum_lake_student.cli train
+
+trace-examples:
+	$(PYTHON) -m quantum_lake_student.cli trace-examples
 
 test:
 	$(PYTHON) -m pytest
