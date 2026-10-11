@@ -1,0 +1,41 @@
+{
+  "google_qec": {
+    "bronze_rows": 250000,
+    "experiment_rows": 5,
+    "gold_decoder_rows": 4,
+    "gold_experiment_rows": 5,
+    "gold_prediction_rows": 1000000,
+    "gold_shot_rows": 250000,
+    "issue_rows": 0,
+    "ml_example_rows": 250000,
+    "rejected_rows": 0,
+    "shot_rows": 250000,
+    "silver_rows": 250005,
+    "trace_rows": 2000005
+  },
+  "qasmbench": {
+    "bronze_rows": 6,
+    "circuit_rows": 6,
+    "conditional_correction_rows": 6,
+    "gold_check_data_qubit_rows": 8,
+    "gold_circuit_rows": 6,
+    "gold_conditional_correction_rows": 6,
+    "gold_register_rows": 16,
+    "gold_stabilizer_check_rows": 4,
+    "issue_rows": 0,
+    "rejected_rows": 0,
+    "silver_rows": 16,
+    "stabilizer_check_rows": 4
+  },
+  "qec_syndromes": {
+    "bronze_rows": 75598,
+    "gold_experiment_rows": 7,
+    "gold_observation_rows": 75598,
+    "gold_pattern_rows": 31941,
+    "issue_rows": 0,
+    "ml_example_rows": 75598,
+    "rejected_rows": 0,
+    "silver_rows": 75598,
+    "weighted_observations": 70000000
+  }
+}

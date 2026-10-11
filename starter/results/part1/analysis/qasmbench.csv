@@ -1,0 +1,9 @@
+benchmark_name,variant,ancilla_qubit,data_qubits,syndrome_bit,condition_value,correction_gate,correction_target
+qec_sm_n5,source,a[0],"['q[0]', 'q[1]']",syn[0],1,x,q[0]
+qec_sm_n5,source,a[0],"['q[0]', 'q[1]']",syn[0],3,x,q[1]
+qec_sm_n5,source,a[1],"['q[1]', 'q[2]']",syn[1],2,x,q[2]
+qec_sm_n5,source,a[1],"['q[1]', 'q[2]']",syn[1],3,x,q[1]
+qec_sm_n5,transpiled,a[0],"['q[0]', 'q[1]']",syn[0],1,x,q[0]
+qec_sm_n5,transpiled,a[0],"['q[0]', 'q[1]']",syn[0],3,x,q[1]
+qec_sm_n5,transpiled,a[1],"['q[1]', 'q[2]']",syn[1],2,x,q[2]
+qec_sm_n5,transpiled,a[1],"['q[1]', 'q[2]']",syn[1],3,x,q[1]

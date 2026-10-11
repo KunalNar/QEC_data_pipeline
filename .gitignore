@@ -3,11 +3,23 @@
 **/__pycache__/
 **/.pytest_cache/
 **/.venv/
-starter/lake/
+starter/lake/*
+!starter/lake/silver/
+!starter/lake/ml/
+!starter/lake/README.md
+starter/lake/**/*.tmp
 starter/reports/
 starter/.coverage
 
 **/.ipynb_checkpoints/
-starter/results/part1/
+starter/results/part1/*
+!starter/results/part1/data_issues.parquet
+!starter/results/part1/run.json
+!starter/results/part1/row_counts.json
+!starter/results/part1/source_trace.parquet
+!starter/results/part1/trace_examples.json
+!starter/results/part1/analysis/
+starter/results/part1/analysis/*
+!starter/results/part1/analysis/*.csv
 starter/results/part2/
 datasets/student-bundle/core/raw/

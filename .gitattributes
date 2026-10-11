@@ -1,0 +1,5 @@
+# Preserve exact submission bytes so the run-record hashes survive checkout.
+starter/lake/**/*.parquet -text
+starter/results/part1/*.parquet -text
+starter/results/part1/*.json -text
+starter/results/part1/analysis/*.csv -text whitespace=cr-at-eol

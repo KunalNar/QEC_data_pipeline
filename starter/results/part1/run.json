@@ -1,0 +1,384 @@
+{
+  "checks": {
+    "gold_and_ml": {
+      "all_three_gold_loads_atomic": {
+        "status": "passed"
+      },
+      "google_gold_to_ml": {
+        "status": "passed"
+      },
+      "prediction_traces": {
+        "status": "passed"
+      },
+      "source_trace": {
+        "status": "passed"
+      },
+      "syndrome_gold_to_ml": {
+        "status": "passed"
+      }
+    },
+    "google_qec": {
+      "archive_crc": {
+        "status": "passed"
+      },
+      "archive_member_names_unique": {
+        "status": "passed"
+      },
+      "archive_member_paths": {
+        "status": "passed"
+      },
+      "binary_text_domain": {
+        "status": "passed"
+      },
+      "binary_text_lengths": {
+        "status": "passed"
+      },
+      "bronze_size_and_sha256": {
+        "status": "passed"
+      },
+      "directory_metadata_consistency": {
+        "status": "passed"
+      },
+      "experiment_directory_count": {
+        "actual": 5,
+        "status": "passed"
+      },
+      "experiment_shot_relationship": {
+        "status": "passed"
+      },
+      "packed_file_lengths": {
+        "status": "passed"
+      },
+      "packed_padding_bits": {
+        "status": "passed"
+      },
+      "required_companion_files": {
+        "status": "passed"
+      },
+      "row_reconciliation": {
+        "status": "passed"
+      },
+      "source_record_id_uniqueness": {
+        "status": "passed"
+      },
+      "source_trace_companion_rows": {
+        "actual": 2000005,
+        "expected": 2000005,
+        "status": "passed"
+      },
+      "source_trace_coverage": {
+        "status": "passed"
+      }
+    },
+    "qasmbench": {
+      "archive_crc": {
+        "status": "passed"
+      },
+      "archive_member_names_unique": {
+        "status": "passed"
+      },
+      "archive_member_paths": {
+        "status": "passed"
+      },
+      "bronze_size_and_sha256": {
+        "status": "passed"
+      },
+      "declared_qubit_counts": {
+        "circuits": {
+          "error_correctiond3_n5:source": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 114,
+            "qubits": 5,
+            "two_qubit_gates": 49
+          },
+          "error_correctiond3_n5:transpiled": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 237,
+            "qubits": 5,
+            "two_qubit_gates": 49
+          },
+          "qec_en_n5:source": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 25,
+            "qubits": 5,
+            "two_qubit_gates": 10
+          },
+          "qec_en_n5:transpiled": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 46,
+            "qubits": 5,
+            "two_qubit_gates": 10
+          },
+          "qec_sm_n5:source": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 5,
+            "qubits": 5,
+            "two_qubit_gates": 4
+          },
+          "qec_sm_n5:transpiled": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 5,
+            "qubits": 5,
+            "two_qubit_gates": 4
+          }
+        },
+        "status": "passed"
+      },
+      "executed_measurement_counts": {
+        "status": "passed"
+      },
+      "explicit_stabilizer_checks": {
+        "rows": 4,
+        "status": "passed"
+      },
+      "openqasm_structure": {
+        "status": "passed"
+      },
+      "operation_and_two_qubit_counts": {
+        "circuits": {
+          "error_correctiond3_n5:source": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 114,
+            "qubits": 5,
+            "two_qubit_gates": 49
+          },
+          "error_correctiond3_n5:transpiled": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 237,
+            "qubits": 5,
+            "two_qubit_gates": 49
+          },
+          "qec_en_n5:source": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 25,
+            "qubits": 5,
+            "two_qubit_gates": 10
+          },
+          "qec_en_n5:transpiled": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 46,
+            "qubits": 5,
+            "two_qubit_gates": 10
+          },
+          "qec_sm_n5:source": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 5,
+            "qubits": 5,
+            "two_qubit_gates": 4
+          },
+          "qec_sm_n5:transpiled": {
+            "classical_bits": 5,
+            "measurements": 5,
+            "operations": 5,
+            "qubits": 5,
+            "two_qubit_gates": 4
+          }
+        },
+        "status": "passed"
+      },
+      "qasm_member_set": {
+        "actual": 6,
+        "status": "passed"
+      },
+      "row_reconciliation": {
+        "status": "passed"
+      },
+      "source_and_transpiled_variants": {
+        "status": "passed"
+      },
+      "source_record_id_uniqueness": {
+        "status": "passed"
+      },
+      "source_trace_coverage": {
+        "status": "passed"
+      },
+      "syndrome_controlled_corrections": {
+        "rows": 6,
+        "status": "passed"
+      }
+    },
+    "qec_syndromes": {
+      "archive_crc": {
+        "status": "passed"
+      },
+      "archive_member_names_unique": {
+        "status": "passed"
+      },
+      "archive_member_paths": {
+        "status": "passed"
+      },
+      "bronze_size_and_sha256": {
+        "status": "passed"
+      },
+      "csv_file_count": {
+        "actual": 7,
+        "status": "passed"
+      },
+      "csv_headers": {
+        "status": "passed"
+      },
+      "filename_metadata": {
+        "status": "passed"
+      },
+      "label_domain": {
+        "status": "passed"
+      },
+      "positive_integer_quantities": {
+        "status": "passed"
+      },
+      "row_reconciliation": {
+        "status": "passed"
+      },
+      "source_record_id_uniqueness": {
+        "status": "passed"
+      },
+      "source_trace_coverage": {
+        "status": "passed"
+      },
+      "syndrome_bit_domain": {
+        "status": "passed"
+      },
+      "syndrome_shape": {
+        "status": "passed"
+      },
+      "valid_same_syndrome_different_label": {
+        "groups": 25159,
+        "status": "passed"
+      },
+      "weighted_totals": {
+        "status": "passed"
+      }
+    }
+  },
+  "code_revision": "8eb91d73b4d44910f834edfbc068526ca8fafc08a45c5413c8edebfcb9a947e4",
+  "code_revision_kind": "source_tree_sha256",
+  "finished_at": "2026-10-11T09:07:15.724675+00:00",
+  "input_hashes": {
+    "bronze/source=google_qec/google-surface-code-curated.zip": "5d6a24f89f055883a49910979490be4baef54d28bf9a0f8e096a1d6c46d1ea56",
+    "bronze/source=qasmbench/qasmbench-qec.zip": "60307f88e34b1f752b94223d6d136da72c629b4b625ac6d1c30e5e2e4f85722a",
+    "bronze/source=qec_syndromes/syndromes_dataset.zip": "bdfce36a71f04295ac78fb372d9c2e381801c05e3be119f919750ef59026d072"
+  },
+  "outputs": {
+    "gold.google_decoder": {
+      "rows": 4
+    },
+    "gold.google_decoder_prediction": {
+      "rows": 1000000
+    },
+    "gold.google_experiment": {
+      "rows": 5
+    },
+    "gold.google_shot": {
+      "rows": 250000
+    },
+    "gold.qasm_check_data_qubit": {
+      "rows": 8
+    },
+    "gold.qasm_circuit": {
+      "rows": 6
+    },
+    "gold.qasm_conditional_correction": {
+      "rows": 6
+    },
+    "gold.qasm_register": {
+      "rows": 16
+    },
+    "gold.qasm_stabilizer_check": {
+      "rows": 4
+    },
+    "gold.syndrome_experiment": {
+      "rows": 7
+    },
+    "gold.syndrome_observation": {
+      "rows": 75598
+    },
+    "gold.syndrome_pattern": {
+      "rows": 31941
+    },
+    "ml/ml_google_decoder_example.parquet": {
+      "rows": 250000,
+      "sha256": "e8332a2d979dde9b557a3aaeecaf58f0fac08d5ee5d277bb7498db937a1719db"
+    },
+    "ml/ml_syndrome_decoder_example.parquet": {
+      "rows": 75598,
+      "sha256": "05abd4a787176222c3b13a58fbf02b32d856e8c4ecb92df50dfa563a7791bcc2"
+    },
+    "results/part1/analysis/google_decoders.csv": {
+      "rows": 20,
+      "sha256": "0ec1053f78da4469942918a4aa3b8b3e30742ecfc3b59d144378255df0ef915a"
+    },
+    "results/part1/analysis/qasmbench.csv": {
+      "rows": 8,
+      "sha256": "9e15de04829ca0fad3a6e627b1498289eda05d63d5dc1717dac9bd10ccea9e39"
+    },
+    "results/part1/analysis/syndrome_fault_rate.csv": {
+      "rows": 7,
+      "sha256": "13192c413f55cd47799288c4f1d05ae391d2df42cab83c2b6a394ca8bd93ae23"
+    },
+    "results/part1/analysis/syndrome_patterns.csv": {
+      "rows": 35,
+      "sha256": "f25b1492bf49636c187376e1022b335699d554c608b8fab247f5624b566a03ad"
+    },
+    "results/part1/data_issues.parquet": {
+      "rows": 0,
+      "sha256": "83106eb6a4d1f2c4ec70eb230985cd9e8f7527f88824e978bdfa7fe93be6cf61"
+    },
+    "results/part1/source_trace.parquet": {
+      "rows": 2075619,
+      "sha256": "50221c37ef5a58641986fe74b13663d28367033b72893ffb7b43adc089f1ce96"
+    },
+    "results/part1/trace_examples.json": {
+      "rows": 2,
+      "sha256": "579b72d7d8dba6ac8339b9e680c7bace519485d07c173cc1eb0487a8f1a96b8b"
+    },
+    "silver/google_qec/experiment.parquet": {
+      "rows": 5,
+      "sha256": "eab7a49d43ad44446331d19f0f0dafd58442812c2ddd2fe04263a50f10ca150c"
+    },
+    "silver/google_qec/shot.parquet": {
+      "rows": 250000,
+      "sha256": "a6e58e58790ed3df8666501fb671df5071ec8a765ce4e540026f8f63335f1aeb"
+    },
+    "silver/qasmbench/circuit.parquet": {
+      "rows": 6,
+      "sha256": "33660cd4ef678fb8c79dd1b8172dc4f573ae35e4dd27da6ebe32aaa32274a41e"
+    },
+    "silver/qasmbench/conditional_correction.parquet": {
+      "rows": 6,
+      "sha256": "c90fd09e884bd2ec1fe92d9d1786b2ac4c0f08a6cfd4272d862aedc9e85253d5"
+    },
+    "silver/qasmbench/stabilizer_check.parquet": {
+      "rows": 4,
+      "sha256": "5f4eb9011645472e283ff125398c8cc4544eafeab25dc74d5f9dcf27389e4dd4"
+    },
+    "silver/qec_syndromes/syndrome_observation.parquet": {
+      "rows": 75598,
+      "sha256": "1211270b651fc50dfb2ce5327c1b0fb4f3d9d6f10cd7072e2b0a4fef4b3ef522"
+    }
+  },
+  "release": {
+    "date": "2026-08-05",
+    "name": "quantum-data-core",
+    "version": 3
+  },
+  "run_id": "part1-eb72127e060741aa94b6b4eea3939f1c",
+  "scope": [
+    "qec_syndromes",
+    "qasmbench",
+    "google_qec"
+  ],
+  "stage": "run_part1",
+  "started_at": "2026-10-11T09:05:03.956392+00:00",
+  "status": "complete"
+}
