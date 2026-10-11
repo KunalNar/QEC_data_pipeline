@@ -30,11 +30,14 @@ Gold source rows. `results/part1/source_trace.parquet` then gives the Bronze
 member and record position; a Google shot has eight companion-file trace
 rows. The same result directory contains `run.json`, `row_counts.json`,
 and `trace_examples.json`. In `starter/`, `make run` recreates the full
-Part I handoff. The trace examples currently start at ML `example_id`;
-model-prediction rows are not part of Part I.
+Part I handoff. The trace examples currently start at ML `example_id`.
+Completing the required prediction-to-Bronze examples also needs saved Part II
+prediction rows with the same `example_id`. Task A syndrome predictions and
+Task C Google predictions provide these on the reviewed integration branch;
+this does not depend on Task B.
 
 - [Exact ML table contracts](../../assignment/required-ml-tables.md)
 - [Object-store access helper](../src/quantum_lake_student/connections.py)
 - [Supplied model-input, split, and metric helpers](../src/quantum_lake_student/ml.py)
 - [Gold table definitions](gold-schema.md)
-- [Part I quality summary](part1-report.md)
+- [Part I quality summary](report_parta.md)

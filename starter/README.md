@@ -25,10 +25,7 @@ from Gold. `make gold-qasmbench` loads the QASMBench circuit relationships.
 `make ml-google` exports the Google ML handoff. `make run` rebuilds all three
 sources, loads Gold in one transaction, exports both ML tables, and writes
 the complete evidence under `results/part1/`; see the
-[Part I report](docs/part1-report.md). The earlier
-`make run-syndrome-qasm` checkpoint remains available under
-`results/part1/syndrome_qasm/`; see its
-[two-source report](docs/part1-syndrome-qasm-report.md).
+[Part I report](docs/report_parta.md).
 The [Part II handoff](docs/part2-handoff.md) summarizes the available data
 products for the ML team.
 
@@ -63,9 +60,11 @@ the assignment.
 inputs, partition loading, and weighted LER. It does not select models, perform
 training, or interpret results. Those remain required Part II work.
 
-Generated data, reports, credentials, and notebook outputs should not be
-committed to version control. Write required run evidence and outputs under the
-`results/part1/` and `results/part2/` layout described in the brief.
+Required Silver and ML submission snapshots are tracked under
+[`lake/`](lake/README.md), together with the final `results/part1/` evidence.
+Raw archives, credentials, database volumes, temporary outputs, and notebook
+outputs remain untracked. Part II results use the separate `results/part2/`
+layout described in the brief.
 
 The AI/ML stage is a downstream consumer check. A particular model score or an
 improvement over a supplied decoder is not part of the grade.
