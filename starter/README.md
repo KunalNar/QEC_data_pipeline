@@ -28,8 +28,11 @@ the complete evidence under `results/part1/`; see the
 [Part I report](docs/report_parta.md).
 
 `make check` verifies connections, `make inventory` lists the three Bronze
-objects, and `make test` runs the automated checks. Part II `make train`
-remains for the ML team.
+objects, and `make test` runs the automated checks. `make train` runs Part II
+Tasks A, B, and C and creates fitted models, predictions, metrics, run settings,
+and the report under `results/part2/`. Afterwards, `make trace-examples`
+connects saved predictions to their Part I source records. Run these commands
+from `starter/` inside the workspace container.
 
 Suggested source layout:
 

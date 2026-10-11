@@ -3,3 +3,6 @@ starter/lake/**/*.parquet -text
 starter/results/part1/*.parquet -text
 starter/results/part1/*.json -text
 starter/results/part1/analysis/*.csv -text whitespace=cr-at-eol
+starter/results/part2/*.parquet -text
+starter/results/part2/*.json -text
+starter/results/part2/*.joblib -text

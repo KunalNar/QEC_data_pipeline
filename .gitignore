@@ -21,5 +21,13 @@ starter/results/part1/*
 !starter/results/part1/analysis/
 starter/results/part1/analysis/*
 !starter/results/part1/analysis/*.csv
-starter/results/part2/
+starter/results/part2/*
+!starter/results/part2/predictions.parquet
+!starter/results/part2/metrics.json
+!starter/results/part2/run.json
+!starter/results/part2/report.md
+!starter/results/part2/task_a_model.joblib
+!starter/results/part2/task_b_distance_3_model.joblib
+!starter/results/part2/task_b_distance_5_model.joblib
+!starter/results/part2/task_c_model.joblib
 datasets/student-bundle/core/raw/

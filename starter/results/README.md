@@ -34,5 +34,8 @@ examples. It does not train models. Repeat it after regenerating Part I or the
 predictions, because `make run` initially writes ML-to-Bronze examples without
 model predictions.
 
-Part II outputs, older scoped checkpoints, temporary files, course archives,
-credentials, and database volumes remain outside this commit.
+The four required Part II result files and four fitted learned-model files are
+also tracked as submission snapshots. `make train` regenerates them from the
+two ML tables, replacing each task's predictions without duplicating them.
+Older scoped checkpoints, temporary files, course archives, credentials, and
+database volumes remain untracked.
