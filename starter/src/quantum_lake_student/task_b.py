@@ -81,7 +81,9 @@ def build_distance_data(
     )
 
     if features.shape[1] != 5:
-        raise ValueError("Task B must use exactly five input features")
+        raise ValueError(
+            "Task B must use exactly five input features"
+        )
 
     split = subset["data_split"].astype(str).to_numpy()
 
@@ -206,6 +208,8 @@ def train_combined_decoder(
     )
 
     return model, threshold, train_seconds
+
+
 SUPPLIED_DECODER_MODEL_IDS = {
     "belief_matching_prediction": "B_belief_matching",
     "correlated_matching_prediction": "B_correlated_matching",
@@ -328,10 +332,12 @@ def evaluate_distance(
         }
     )
 
+    # -------------------------------------------------------------
     # Four supplied decoder predictions
     #
     # Columns 1-4 of the Task B feature matrix are exactly the four
     # supplied decoder predictions. Column 0 is detector-event density.
+    # -------------------------------------------------------------
     for feature_index, decoder_column in enumerate(
         GOOGLE_META_PREDICTION_COLUMNS,
         start=1,
@@ -375,7 +381,9 @@ def evaluate_distance(
             }
         )
 
+    # -------------------------------------------------------------
     # Combined logistic regression
+    # -------------------------------------------------------------
     prediction_frames.append(
         pd.DataFrame(
             {
@@ -419,6 +427,8 @@ def evaluate_distance(
     )
 
     return combined_model, evaluation
+
+
 def decoder_error_overlap(
     data: DistanceData,
 ) -> dict[str, object]:
@@ -428,26 +438,41 @@ def decoder_error_overlap(
     labels = data.label[test_mask]
 
     # Columns 1-4 are the four supplied decoder predictions.
-    supplied_predictions = data.features[test_mask, 1:5].astype(bool)
+    supplied_predictions = data.features[
+        test_mask,
+        1:5,
+    ].astype(bool)
 
     errors = supplied_predictions != labels[:, None]
 
     decoder_names = list(GOOGLE_META_PREDICTION_COLUMNS)
 
     error_rates = {
-        decoder_names[index]: float(errors[:, index].mean())
+        decoder_names[index]: float(
+            errors[:, index].mean()
+        )
         for index in range(len(decoder_names))
     }
 
     pairwise_overlap = {}
 
     for left_index in range(len(decoder_names)):
-        for right_index in range(left_index + 1, len(decoder_names)):
+        for right_index in range(
+            left_index + 1,
+            len(decoder_names),
+        ):
             left_name = decoder_names[left_index]
             right_name = decoder_names[right_index]
 
-            both_wrong = errors[:, left_index] & errors[:, right_index]
-            either_wrong = errors[:, left_index] | errors[:, right_index]
+            both_wrong = (
+                errors[:, left_index]
+                & errors[:, right_index]
+            )
+
+            either_wrong = (
+                errors[:, left_index]
+                | errors[:, right_index]
+            )
 
             intersection = int(both_wrong.sum())
             union = int(either_wrong.sum())
@@ -466,9 +491,17 @@ def decoder_error_overlap(
                 "error_jaccard": jaccard,
             }
 
-    all_wrong = int(errors.all(axis=1).sum())
-    any_wrong = int(errors.any(axis=1).sum())
-    exactly_one_wrong = int((errors.sum(axis=1) == 1).sum())
+    all_wrong = int(
+        errors.all(axis=1).sum()
+    )
+
+    any_wrong = int(
+        errors.any(axis=1).sum()
+    )
+
+    exactly_one_wrong = int(
+        (errors.sum(axis=1) == 1).sum()
+    )
 
     return {
         "decoder_error_rates": error_rates,
@@ -479,19 +512,35 @@ def decoder_error_overlap(
         "test_examples": int(len(labels)),
     }
 
+
 def _read_json(path: Path) -> dict:
     """Read a JSON file if it exists, otherwise return an empty dict."""
+
     if not path.exists():
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+
+    return json.loads(
+        path.read_text(
+            encoding="utf-8",
+        )
+    )
 
 
-def _write_json(path: Path, value: dict) -> None:
+def _write_json(
+    path: Path,
+    value: dict,
+) -> None:
     """Write a JSON object using the shared Part II formatting."""
+
     path.write_text(
-        json.dumps(value, indent=2) + "\n",
+        json.dumps(
+            value,
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
+
 
 def train_task_b(
     settings: Settings,
@@ -501,18 +550,32 @@ def train_task_b(
 ) -> StageResult:
     """Train and evaluate Task B for distances 3 and 5."""
 
-    result = StageResult(stage="train_task_b", run_id=run_id)
+    result = StageResult(
+        stage="train_task_b",
+        run_id=run_id,
+    )
 
-    google_bytes = read_lake_object(settings, GOOGLE_ML_OBJECT)
-    google = pq.read_table(io.BytesIO(google_bytes)).to_pandas()
+    google_bytes = read_lake_object(
+        settings,
+        GOOGLE_ML_OBJECT,
+    )
+
+    google = pq.read_table(
+        io.BytesIO(google_bytes)
+    ).to_pandas()
 
     all_predictions = []
     all_metrics = []
+
     overlap_by_distance = {}
     trained_models = {}
+    evaluations_by_distance = {}
 
     for distance in DISTANCES:
-        data = build_distance_data(google, distance)
+        data = build_distance_data(
+            google,
+            distance,
+        )
 
         model, evaluation = evaluate_distance(
             data,
@@ -520,42 +583,68 @@ def train_task_b(
         )
 
         trained_models[distance] = model
-        all_predictions.append(evaluation.predictions)
-        all_metrics.extend(evaluation.metrics)
+        evaluations_by_distance[distance] = evaluation
 
-        overlap_by_distance[str(distance)] = decoder_error_overlap(data)
+        all_predictions.append(
+            evaluation.predictions
+        )
+
+        all_metrics.extend(
+            evaluation.metrics
+        )
+
+        overlap_by_distance[
+            str(distance)
+        ] = decoder_error_overlap(data)
 
     task_b_predictions = pd.concat(
         all_predictions,
         ignore_index=True,
     )
 
-    results_root.mkdir(parents=True, exist_ok=True)
+    results_root.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
+    # -------------------------------------------------------------
     # Save one combined logistic-regression model per distance.
+    # -------------------------------------------------------------
     for distance, model in trained_models.items():
         joblib.dump(
             model,
-            results_root / f"task_b_distance_{distance}_model.joblib",
+            results_root
+            / f"task_b_distance_{distance}_model.joblib",
         )
 
     # -------------------------------------------------------------
     # predictions.parquet
+    #
     # Replace only Task B rows so rerunning does not create duplicates.
     # -------------------------------------------------------------
-    predictions_path = results_root / "predictions.parquet"
+    predictions_path = (
+        results_root
+        / "predictions.parquet"
+    )
 
     merged_predictions = task_b_predictions
 
     if predictions_path.exists():
-        existing = pd.read_parquet(predictions_path)
+        existing = pd.read_parquet(
+            predictions_path
+        )
 
         other_tasks = existing[
-            ~existing["model_id"].isin(TASK_B_MODEL_IDS)
+            ~existing["model_id"].isin(
+                TASK_B_MODEL_IDS
+            )
         ]
 
         merged_predictions = pd.concat(
-            [other_tasks, task_b_predictions],
+            [
+                other_tasks,
+                task_b_predictions,
+            ],
             ignore_index=True,
         )
 
@@ -567,8 +656,14 @@ def train_task_b(
     # -------------------------------------------------------------
     # metrics.json
     # -------------------------------------------------------------
-    metrics_path = results_root / "metrics.json"
-    metrics_record = _read_json(metrics_path)
+    metrics_path = (
+        results_root
+        / "metrics.json"
+    )
+
+    metrics_record = _read_json(
+        metrics_path
+    )
 
     distance_metrics = {}
 
@@ -579,22 +674,42 @@ def train_task_b(
             if row["distance"] == distance
         ]
 
-        distance_metrics[str(distance)] = {
+        distance_metrics[
+            str(distance)
+        ] = {
             row["model_id"]: {
-                "logical_error_rate": row["logical_error_rate"],
-                "balanced_accuracy": row["balanced_accuracy"],
-                "brier_score": row["brier_score"],
-                "training_time_seconds": row["training_time_seconds"],
-                "prediction_time_seconds": row["prediction_time_seconds"],
-                "threshold": row["threshold"],
-                "test_examples": row["test_examples"],
+                "logical_error_rate": (
+                    row["logical_error_rate"]
+                ),
+                "balanced_accuracy": (
+                    row["balanced_accuracy"]
+                ),
+                "brier_score": (
+                    row["brier_score"]
+                ),
+                "training_time_seconds": (
+                    row["training_time_seconds"]
+                ),
+                "prediction_time_seconds": (
+                    row["prediction_time_seconds"]
+                ),
+                "threshold": (
+                    row["threshold"]
+                ),
+                "test_examples": (
+                    row["test_examples"]
+                ),
             }
             for row in rows
         }
 
-    metrics_record[TASK_B_KEY] = {
+    metrics_record[
+        TASK_B_KEY
+    ] = {
         "distances": distance_metrics,
-        "decoder_error_overlap": overlap_by_distance,
+        "decoder_error_overlap": (
+            overlap_by_distance
+        ),
     }
 
     _write_json(
@@ -605,30 +720,44 @@ def train_task_b(
     # -------------------------------------------------------------
     # run.json
     # -------------------------------------------------------------
-    run_path = results_root / "run.json"
-    run_record = _read_json(run_path)
+    run_path = (
+        results_root
+        / "run.json"
+    )
 
-    run_record.setdefault("ml_input_hashes", {})[
-        GOOGLE_ML_OBJECT
-    ] = hashlib.sha256(google_bytes).hexdigest()
+    run_record = _read_json(
+        run_path
+    )
+
+    run_record.setdefault(
+        "ml_input_hashes",
+        {},
+    )[GOOGLE_ML_OBJECT] = hashlib.sha256(
+        google_bytes
+    ).hexdigest()
 
     run_record["random_seed"] = SEED
 
-    run_record.setdefault("feature_order", {})[
-        TASK_B_KEY
-    ] = list(FEATURE_NAMES)
+    run_record.setdefault(
+        "feature_order",
+        {},
+    )[TASK_B_KEY] = list(
+        FEATURE_NAMES
+    )
 
-    run_record.setdefault("split_rules", {})[
-        TASK_B_KEY
-    ] = (
+    run_record.setdefault(
+        "split_rules",
+        {},
+    )[TASK_B_KEY] = (
         "google_data_split separately for distances 3 and 5: "
         "odd shot_index test, shot_index % 10 == 8 validation, "
         "other even shot_index train"
     )
 
-    run_record.setdefault("task_settings", {})[
-        TASK_B_KEY
-    ] = {
+    run_record.setdefault(
+        "task_settings",
+        {},
+    )[TASK_B_KEY] = {
         "model": "LogisticRegression",
         "max_iter": 1000,
         "threshold_grid": [
@@ -639,8 +768,60 @@ def train_task_b(
             "lowest validation logical-error rate; "
             "ties go to threshold nearest 0.5"
         ),
-        "distances": list(DISTANCES),
+        "distances": list(
+            DISTANCES
+        ),
+        "selected_thresholds": {
+            str(distance): (
+                evaluations_by_distance[
+                    distance
+                ].threshold
+            )
+            for distance in DISTANCES
+        },
     }
+
+    # -------------------------------------------------------------
+    # Task B timings
+    # -------------------------------------------------------------
+    task_b_timings = {}
+
+    for distance in DISTANCES:
+        rows_by_model = {
+            row["model_id"]: row
+            for row in all_metrics
+            if row["distance"] == distance
+        }
+
+        task_b_timings[
+            str(distance)
+        ] = {
+            "prior_baseline_training_seconds": (
+                rows_by_model[
+                    BASELINE_MODEL_ID
+                ]["training_time_seconds"]
+            ),
+            "prior_baseline_prediction_seconds": (
+                rows_by_model[
+                    BASELINE_MODEL_ID
+                ]["prediction_time_seconds"]
+            ),
+            "combined_training_seconds": (
+                rows_by_model[
+                    COMBINED_MODEL_ID
+                ]["training_time_seconds"]
+            ),
+            "combined_prediction_seconds": (
+                rows_by_model[
+                    COMBINED_MODEL_ID
+                ]["prediction_time_seconds"]
+            ),
+        }
+
+    run_record.setdefault(
+        "timings",
+        {},
+    )[TASK_B_KEY] = task_b_timings
 
     _write_json(
         run_path,
@@ -648,7 +829,10 @@ def train_task_b(
     )
 
     result.input_count = len(google)
-    result.output_count = len(task_b_predictions)
+    result.output_count = len(
+        task_b_predictions
+    )
+
     result.finish()
 
-    return result    
+    return result
